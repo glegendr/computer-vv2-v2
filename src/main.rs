@@ -266,3 +266,36 @@ mod matrices {
     }
 
 }
+
+#[cfg(test)]
+mod parse_line {
+    use super::*;
+
+    #[test]
+    fn multiple_operators() {
+        assert_eq!(parse_line(" 1 + 2 - + 2").is_ok(), false);
+        assert_eq!(parse_line(" 1 + 2 / / 2").is_ok(), false);
+        assert_eq!(parse_line(" 1 + 2 / 2 %^ 2").is_ok(), false);
+        assert_eq!(parse_line(" 1 + 2 / 2 ++ 2").is_ok(), false);
+        assert_eq!(parse_line(" 1 + 2 / 2 * * 2").is_ok(), false);
+    }
+
+    #[test]
+    fn multiple_vars() {
+        assert_eq!(parse_line(" 1.2 + 3.2 4.5 - 1").is_ok(), false);
+        assert_eq!(parse_line(" 123 + ASD - eQWEQcszc czx").is_ok(), false);
+        assert_eq!(parse_line("- 123 + 3123 a").is_ok(), false);
+        assert_eq!(parse_line("z z").is_ok(), false);
+        assert_eq!(parse_line("Xx 123 xX").is_ok(), false);
+    }
+    
+    #[test]
+    fn bad_var() {
+        assert_eq!(parse_line("[[1,3 ]; [1,23.3];] * 2").is_ok(), false);
+        assert_eq!(parse_line("__a() 1").is_ok(), false);
+        assert_eq!(parse_line("1.2.3 + 2").is_ok(), false);
+        assert_eq!(parse_line("a$a + 2").is_ok(), false);
+        assert_eq!(parse_line("5$a + 2").is_ok(), false);
+    }
+
+}
