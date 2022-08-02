@@ -21,7 +21,6 @@ fn main() -> rustyline::Result<()> {
     Ok(())
 }
 
-
 #[derive(Clone, Debug, PartialEq)]
 enum Operator {
     Var(String),
@@ -35,10 +34,28 @@ enum Operator {
     OpenParenthesis,
     CloseParenthesis,
     Div,
-    Mat(Vec<Vec<Operator>>)
+    Mat(Vec<Vec<Operator>>),
 }
 
 impl Operator {
+
+    fn get_precedence(&self) -> u8 {
+        match self {
+            Operator::Add | Operator::Minus => 2,
+            Operator::Mult | Operator::Div => 3,
+            Operator::Power => 4,
+            Operator::CloseParenthesis | Operator::OpenParenthesis => 1,
+            _ => unreachable!()
+        }
+    }
+
+    fn get_associativity(&self) -> bool {
+        match self {
+            Operator::Power => true,
+            _ => false
+        }
+    }
+
     fn from_str(value: &str) -> Result<Self, String> {
         match value.trim() {
             "+" => Ok(Self::Add),
@@ -142,7 +159,7 @@ impl Operator {
     }
 }
 
-fn parse_line(line: &str) -> Result<(), String>{
+fn parse_line(line: &str) -> Result<(), String> {
     let mut saved = String::default();
     let mut operators: Vec<Operator> = Vec::default();
     for c in line.chars() {
@@ -158,10 +175,69 @@ fn parse_line(line: &str) -> Result<(), String>{
         operators.push(Operator::from_str(&saved)?);
         saved.clear();
     }
-    println!("{:?}", operators);
+
+    operators
+        .iter()
+        .map(|ope| match ope {
+            Operator::OpenParenthesis => 1,
+            Operator::CloseParenthesis => -1,
+            _ => 0
+        })
+        .fold(Ok(0), |acc, ope| {
+            if acc? + ope < 0 {
+                return Err("missmatched parenthesis")  
+            }
+            Ok(acc? + ope)
+        })?;
+
     Ok(())
 }
 
+
+fn shunting_yard(input: &mut Vec<Operator>) -> Result<Vec<Operator>, String> {
+    let mut output = Vec::new();
+    let mut stack = Vec::new();
+    input.reverse();
+    'a: while let Some(operator) = input.pop() {
+        match operator {
+            Operator::Var(_) => unreachable!(),
+            Operator::Number(_) | Operator::Mat(_) => output.push(operator),
+            Operator::OpenParenthesis => stack.push(operator),
+            Operator::CloseParenthesis => {
+                while let Some(stack_ope) = stack.pop() {
+                    match stack_ope {
+                        Operator::OpenParenthesis => continue 'a,
+                        Operator::CloseParenthesis => return Err(String::from("Missmatched parentesis 00")),
+                        _ => output.push(stack_ope),
+                    }
+                }
+                if stack.is_empty() {
+                    return Err(String::from("Missmatched parentesis 01"))
+                }
+            }
+            _ => {
+                while let Some(stack_ope) = stack.pop() {
+                    if stack_ope.get_precedence() > operator.get_precedence() || (stack_ope.get_precedence() == operator.get_precedence() && !operator.get_associativity()) {
+                        output.push(stack_ope);
+                    } else {
+                        stack.push(stack_ope);
+                        break;
+                    }
+                }
+                stack.push(operator);
+            }
+        }
+    }
+
+    while let Some(stack_ope) = stack.pop() {
+        match stack_ope {
+            Operator::OpenParenthesis | Operator::CloseParenthesis => return Err(String::from("Missmatched parentesis 02")),
+            _ => output.push(stack_ope)
+        }
+    }
+
+    Ok(output)
+}
 
 #[cfg(test)]
 mod matrices {
@@ -268,34 +344,162 @@ mod matrices {
 }
 
 #[cfg(test)]
-mod parse_line {
+mod polish {
     use super::*;
 
     #[test]
-    fn multiple_operators() {
-        assert_eq!(parse_line(" 1 + 2 - + 2").is_ok(), false);
-        assert_eq!(parse_line(" 1 + 2 / / 2").is_ok(), false);
-        assert_eq!(parse_line(" 1 + 2 / 2 %^ 2").is_ok(), false);
-        assert_eq!(parse_line(" 1 + 2 / 2 ++ 2").is_ok(), false);
-        assert_eq!(parse_line(" 1 + 2 / 2 * * 2").is_ok(), false);
+    fn missmatched() {
+        assert_eq!(shunting_yard(&mut vec![ // ( 2 + 2
+            Operator::OpenParenthesis,
+            Operator::Number(2.),
+            Operator::Add,
+            Operator::Number(2.),
+        ]).is_ok(), false);
+
+        assert_eq!(shunting_yard(&mut vec![ // (2 + 2(
+            Operator::OpenParenthesis,
+            Operator::Number(2.),
+            Operator::Add,
+            Operator::Number(2.),
+            Operator::OpenParenthesis,
+        ]).is_ok(), false);
+
+        assert_eq!(shunting_yard(&mut vec![ // ()2 + 2(
+            Operator::OpenParenthesis,
+            Operator::CloseParenthesis,
+            Operator::Number(2.),
+            Operator::Add,
+            Operator::Number(2.),
+            Operator::OpenParenthesis,
+        ]).is_ok(), false);
+
+        assert_eq!(shunting_yard(&mut vec![ // )2 + 2
+            Operator::CloseParenthesis,
+            Operator::Number(2.),
+            Operator::Add,
+            Operator::Number(2.),
+        ]).is_ok(), false);
     }
 
     #[test]
-    fn multiple_vars() {
-        assert_eq!(parse_line(" 1.2 + 3.2 4.5 - 1").is_ok(), false);
-        assert_eq!(parse_line(" 123 + ASD - eQWEQcszc czx").is_ok(), false);
-        assert_eq!(parse_line("- 123 + 3123 a").is_ok(), false);
-        assert_eq!(parse_line("z z").is_ok(), false);
-        assert_eq!(parse_line("Xx 123 xX").is_ok(), false);
-    }
-    
-    #[test]
-    fn bad_var() {
-        assert_eq!(parse_line("[[1,3 ]; [1,23.3];] * 2").is_ok(), false);
-        assert_eq!(parse_line("__a() 1").is_ok(), false);
-        assert_eq!(parse_line("1.2.3 + 2").is_ok(), false);
-        assert_eq!(parse_line("a$a + 2").is_ok(), false);
-        assert_eq!(parse_line("5$a + 2").is_ok(), false);
-    }
+    fn ok() {
+        assert_eq!(shunting_yard(&mut vec![ // ( 1 + 2)
+            Operator::OpenParenthesis,
+            Operator::Number(1.),
+            Operator::Add,
+            Operator::Number(2.),
+            Operator::CloseParenthesis,
+            ]),
+            Ok(vec![
+                Operator::Number(1.),
+                Operator::Number(2.),
+                Operator::Add,
+            ]));
 
+        assert_eq!(shunting_yard(&mut vec![ //  1 + 2 * 3
+            Operator::Number(1.),
+            Operator::Add,
+            Operator::Number(2.),
+            Operator::Mult,
+            Operator::Number(3.),
+            ]),
+            Ok(vec![
+                Operator::Number(1.),
+                Operator::Number(2.),
+                Operator::Number(3.),
+                Operator::Mult,
+                Operator::Add,
+            ]));
+
+        assert_eq!(shunting_yard(&mut vec![ //  (1 + 2) * 3
+            Operator::OpenParenthesis,
+            Operator::Number(1.),
+            Operator::Add,
+            Operator::Number(2.),
+            Operator::CloseParenthesis,
+            Operator::Mult,
+            Operator::Number(3.),
+            ]),
+            Ok(vec![
+                Operator::Number(1.),
+                Operator::Number(2.),
+                Operator::Add,
+                Operator::Number(3.),
+                Operator::Mult,
+            ])
+        );
+
+        assert_eq!(shunting_yard(&mut vec![ //  6 * ((1 + 2) * 3 / (4 - 5))
+            Operator::Number(6.),
+            Operator::Mult,
+            Operator::OpenParenthesis,
+            Operator::OpenParenthesis,
+            Operator::Number(1.),
+            Operator::Add,
+            Operator::Number(2.),
+            Operator::CloseParenthesis,
+            Operator::Mult,
+            Operator::Number(3.),
+            Operator::Div,
+            Operator::OpenParenthesis,
+            Operator::Number(4.),
+            Operator::Minus,
+            Operator::Number(5.),
+            Operator::CloseParenthesis,
+            Operator::CloseParenthesis,
+            ]),
+            Ok(vec![
+                Operator::Number(6.),
+                Operator::Number(1.),
+                Operator::Number(2.),
+                Operator::Add,
+                Operator::Number(3.),
+                Operator::Mult,
+                Operator::Number(4.),
+                Operator::Number(5.),
+                Operator::Minus,
+                Operator::Div,
+                Operator::Mult,
+            ])
+        );
+
+        assert_eq!(shunting_yard(&mut vec![ //  6 * ((1 + 2) * 3 ^ 7 / (4 - 5))
+            Operator::Number(6.),
+            Operator::Mult,
+            Operator::OpenParenthesis,
+            Operator::OpenParenthesis,
+            Operator::Number(1.),
+            Operator::Add,
+            Operator::Number(2.),
+            Operator::CloseParenthesis,
+            Operator::Mult,
+            Operator::Number(3.),
+            Operator::Power,
+            Operator::Number(7.),
+            Operator::Div,
+            Operator::OpenParenthesis,
+            Operator::Number(4.),
+            Operator::Minus,
+            Operator::Number(5.),
+            Operator::CloseParenthesis,
+            Operator::CloseParenthesis,
+            ]),
+            Ok(vec![
+                Operator::Number(6.),
+                Operator::Number(1.),
+                Operator::Number(2.),
+                Operator::Add,
+                Operator::Number(3.),
+                Operator::Number(7.),
+                Operator::Power,
+                Operator::Mult,
+                Operator::Number(4.),
+                Operator::Number(5.),
+                Operator::Minus,
+                Operator::Div,
+                Operator::Mult,
+            ])
+        );
+
+    }
 }
