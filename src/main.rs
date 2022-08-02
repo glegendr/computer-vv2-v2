@@ -29,7 +29,29 @@ fn main() -> rustyline::Result<()> {
                                 continue
                             }
                         }
-                        println!("{operators:?}");
+                        match splitted.iter().enumerate().fold(Ok(0), |acc, (i, x)| {
+                            let mut nb = acc?;
+                            nb += x.iter().filter(|ope| ope == &&Operator::Var(String::from("?"))).count();
+                            if nb > 1 {
+                                return Err(String::from("Multiple ?"))
+                            } else if nb != 0 && i == 0 {
+                                return Err(String::from("? in first part"))
+                            }
+                            Ok(nb)
+                        }) {
+                            Err(e) => {
+                                println!("{e}");
+                                continue
+                            }
+                            Ok(0) => {
+                                // Assignation
+                                assign(&splitted);
+                            },
+                            _ => {
+                                // Calculation
+                            }
+                        }
+                        println!("{splitted:?}");
                     },
                 }
             },
@@ -41,11 +63,60 @@ fn main() -> rustyline::Result<()> {
     Ok(())
 }
 
+fn assign(input: &Vec<Vec<Operator>>) {
+    let first_part = input.get(0).unwrap();
+
+    match first_part.len() {
+        0 => println!("Empty input"),
+        1 => {
+            // Variable
+            variable_assignation(&input);
+        },
+        2 => {
+            // Function
+            function_assignation(&input);
+        }
+        _ => {
+            println!("Assignation is only available for variable or function. Eq:");
+            println!(">> x = 50 - 8");
+            println!(">> f(x) = 3 * x + 2");
+        }
+    }
+}
+
+fn variable_assignation(input: &Vec<Vec<Operator>>) {
+    let first_part = input.get(0).unwrap();
+
+    match first_part.get(0).unwrap() {
+        Operator::Var(value) => {
+            println!("{value} = ");
+
+        },
+        _ => {
+            println!("Assignation is only available for variable or function. Eq:");
+            println!(">> x = 50 - 8");
+        }
+    }
+}
+
+fn function_assignation(input: &Vec<Vec<Operator>>) {
+    let first_part = input.get(0).unwrap();
+
+    match (first_part.get(0).unwrap(), first_part.get(1).unwrap()) {
+        (Operator::Var(name), Operator::Var(value)) => {
+            println!("{name}({value}) = ");
+        },
+        _ => {
+            println!("Assignation is only available for variable or function. Eq:");
+            println!(">> f(x) = 3 * x + 2");
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 enum Operator {
     Var(String),
     Number(f64),
-    // Function {name: String, value: String},
     Add,
     Minus,
     Mult,
@@ -185,10 +256,10 @@ fn parse_line(line: &str) -> Result<Vec<Operator>, String> {
     let mut saved = String::default();
     let mut operators: Vec<Operator> = Vec::default();
     for c in line.chars() {
-        if !"+-()%^*=".contains(c) || String::from(c).parse::<u8>().is_ok() {
+        if !"+-()%^*=?".contains(c) || String::from(c).parse::<u8>().is_ok() {
             saved.push(c);
         } else {
-            if !saved.is_empty() {
+            if !saved.trim().is_empty() {
                 operators.push(Operator::from_str(&saved)?);
                 saved.clear();
             }
@@ -199,7 +270,6 @@ fn parse_line(line: &str) -> Result<Vec<Operator>, String> {
         operators.push(Operator::from_str(&saved)?);
         saved.clear();
     }
-
     operators
         .iter()
         .map(|ope| match ope {
