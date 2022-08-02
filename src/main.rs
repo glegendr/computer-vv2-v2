@@ -7,13 +7,33 @@ fn main() -> rustyline::Result<()> {
         let readline = rl.readline("> ");
         match readline {
             Ok(line) => {
+                if line.is_empty() {
+                    continue
+                }
                 rl.add_history_entry(line.as_str());
-                if let Err(e) = parse_line(line.as_str()) {
-                    println!("{e}");
+                match parse_line(line.as_str()) {
+                    Err(e) => println!("{e}"),
+                    Ok(operators) => {
+                        let splitted: Vec<Vec<Operator>> = operators
+                            .split(|ope| ope == &Operator::Equal)
+                            .map(|ope| ope.to_vec())
+                            .collect();
+                        match splitted.len() {
+                            0..=1 => {
+                                println!("expect 1 equal");
+                                continue
+                            }
+                            2 => {}
+                            _ => {
+                                println!("too mutch equal found");
+                                continue
+                            }
+                        }
+                        println!("{operators:?}");
+                    },
                 }
             },
-            Err(err) => {
-                println!("Error: {:?}", err);
+            Err(_) => {
                 break
             }
         }
@@ -25,6 +45,7 @@ fn main() -> rustyline::Result<()> {
 enum Operator {
     Var(String),
     Number(f64),
+    // Function {name: String, value: String},
     Add,
     Minus,
     Mult,
@@ -35,6 +56,7 @@ enum Operator {
     CloseParenthesis,
     Div,
     Mat(Vec<Vec<Operator>>),
+    Equal
 }
 
 impl Operator {
@@ -67,6 +89,7 @@ impl Operator {
             "(" => Ok(Self::OpenParenthesis),
             ")" => Ok(Self::CloseParenthesis),
             "/" => Ok(Self::Div),
+            "=" => Ok(Self::Equal),
             value => {
                 if let Some(ope) = Operator::parse_mat(value) {
                     return Ok(ope)
@@ -107,7 +130,6 @@ impl Operator {
                     let mut string = String::from(c);
                     if let Some(last) = string.pop() {
                         if !string.trim().is_empty() {
-                            println!("{string:?} {last}");
                             if let Ok(nb) = string.trim().parse::<f64>() {
                                 if depth != 2 || mat_id != comma_id {
                                     return None
@@ -159,15 +181,17 @@ impl Operator {
     }
 }
 
-fn parse_line(line: &str) -> Result<(), String> {
+fn parse_line(line: &str) -> Result<Vec<Operator>, String> {
     let mut saved = String::default();
     let mut operators: Vec<Operator> = Vec::default();
     for c in line.chars() {
-        if !"+-()%^*".contains(c) || String::from(c).parse::<u8>().is_ok() {
+        if !"+-()%^*=".contains(c) || String::from(c).parse::<u8>().is_ok() {
             saved.push(c);
         } else {
-            operators.push(Operator::from_str(&saved)?);
-            saved.clear();
+            if !saved.is_empty() {
+                operators.push(Operator::from_str(&saved)?);
+                saved.clear();
+            }
             operators.push(Operator::from_str(&String::from(c))?);
         }
     }
@@ -190,7 +214,7 @@ fn parse_line(line: &str) -> Result<(), String> {
             Ok(acc? + ope)
         })?;
 
-    Ok(())
+    shunting_yard(&mut operators)
 }
 
 
@@ -200,8 +224,16 @@ fn shunting_yard(input: &mut Vec<Operator>) -> Result<Vec<Operator>, String> {
     input.reverse();
     'a: while let Some(operator) = input.pop() {
         match operator {
-            Operator::Var(_) => unreachable!(),
-            Operator::Number(_) | Operator::Mat(_) => output.push(operator),
+            Operator::Number(_) | Operator::Mat(_)  | Operator::Var(_) => output.push(operator),
+            Operator::Equal => {
+                while let Some(stack_ope) = stack.pop() {
+                    match stack_ope {
+                        Operator::OpenParenthesis | Operator::CloseParenthesis => return Err(String::from("Missmatched parentesis 02")),
+                        _ => output.push(stack_ope)
+                    }
+                }
+                output.push(Operator::Equal);
+            }
             Operator::OpenParenthesis => stack.push(operator),
             Operator::CloseParenthesis => {
                 while let Some(stack_ope) = stack.pop() {
@@ -379,6 +411,42 @@ mod polish {
             Operator::Add,
             Operator::Number(2.),
         ]).is_ok(), false);
+
+        assert_eq!(shunting_yard(&mut vec![ // (2 + 2 = 2 - 2
+            Operator::OpenParenthesis,
+            Operator::Number(2.),
+            Operator::Add,
+            Operator::Number(2.),
+            Operator::Equal,
+            Operator::Number(2.),
+            Operator::Minus,
+            Operator::Number(2.),
+            ]).is_ok(), false);
+
+        assert_eq!(shunting_yard(&mut vec![ // (2 + 2 = 2 - 2)
+            Operator::OpenParenthesis,
+            Operator::Number(2.),
+            Operator::Add,
+            Operator::Number(2.),
+            Operator::Equal,
+            Operator::Number(2.),
+            Operator::Minus,
+            Operator::Number(2.),
+            Operator::CloseParenthesis,
+            ]).is_ok(), false);
+
+            assert_eq!(shunting_yard(&mut vec![ // (2 + 2 = (2 - 2)
+                Operator::OpenParenthesis,
+                Operator::Number(2.),
+                Operator::Add,
+                Operator::Number(2.),
+                Operator::Equal,
+                Operator::OpenParenthesis,
+                Operator::Number(2.),
+                Operator::Minus,
+                Operator::Number(2.),
+                Operator::CloseParenthesis,
+                ]).is_ok(), false);
     }
 
     #[test]
@@ -429,34 +497,34 @@ mod polish {
             ])
         );
 
-        assert_eq!(shunting_yard(&mut vec![ //  6 * ((1 + 2) * 3 / (4 - 5))
-            Operator::Number(6.),
+        assert_eq!(shunting_yard(&mut vec![ //  a * ((b + c) * d / (e - f))
+            Operator::Var(String::from("a")),
             Operator::Mult,
             Operator::OpenParenthesis,
             Operator::OpenParenthesis,
-            Operator::Number(1.),
+            Operator::Var(String::from("b")),
             Operator::Add,
-            Operator::Number(2.),
+            Operator::Var(String::from("c")),
             Operator::CloseParenthesis,
             Operator::Mult,
-            Operator::Number(3.),
+            Operator::Var(String::from("d")),
             Operator::Div,
             Operator::OpenParenthesis,
-            Operator::Number(4.),
+            Operator::Var(String::from("e")),
             Operator::Minus,
-            Operator::Number(5.),
+            Operator::Var(String::from("f")),
             Operator::CloseParenthesis,
             Operator::CloseParenthesis,
             ]),
             Ok(vec![
-                Operator::Number(6.),
-                Operator::Number(1.),
-                Operator::Number(2.),
+                Operator::Var(String::from("a")),
+                Operator::Var(String::from("b")),
+                Operator::Var(String::from("c")),
                 Operator::Add,
-                Operator::Number(3.),
+                Operator::Var(String::from("d")),
                 Operator::Mult,
-                Operator::Number(4.),
-                Operator::Number(5.),
+                Operator::Var(String::from("e")),
+                Operator::Var(String::from("f")),
                 Operator::Minus,
                 Operator::Div,
                 Operator::Mult,
@@ -498,6 +566,56 @@ mod polish {
                 Operator::Minus,
                 Operator::Div,
                 Operator::Mult,
+            ])
+        );
+
+        assert_eq!(shunting_yard(&mut vec![ //  6 * ((1 + 2) * 3 ^ 7 / (4 - 5)) = 8 - 9 * 10
+            Operator::Number(6.),
+            Operator::Mult,
+            Operator::OpenParenthesis,
+            Operator::OpenParenthesis,
+            Operator::Number(1.),
+            Operator::Add,
+            Operator::Number(2.),
+            Operator::CloseParenthesis,
+            Operator::Mult,
+            Operator::Number(3.),
+            Operator::Power,
+            Operator::Number(7.),
+            Operator::Div,
+            Operator::OpenParenthesis,
+            Operator::Number(4.),
+            Operator::Minus,
+            Operator::Number(5.),
+            Operator::CloseParenthesis,
+            Operator::CloseParenthesis,
+            Operator::Equal,
+            Operator::Number(8.),
+            Operator::Minus,
+            Operator::Number(9.),
+            Operator::Mult,
+            Operator::Number(10.),
+            ]),
+            Ok(vec![
+                Operator::Number(6.),
+                Operator::Number(1.),
+                Operator::Number(2.),
+                Operator::Add,
+                Operator::Number(3.),
+                Operator::Number(7.),
+                Operator::Power,
+                Operator::Mult,
+                Operator::Number(4.),
+                Operator::Number(5.),
+                Operator::Minus,
+                Operator::Div,
+                Operator::Mult,
+                Operator::Equal,
+                Operator::Number(8.),
+                Operator::Number(9.),
+                Operator::Number(10.),
+                Operator::Mult,
+                Operator::Minus,
             ])
         );
 
