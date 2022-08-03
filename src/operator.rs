@@ -15,6 +15,14 @@ pub enum Operator {
     Equal
 }
 
+fn i_mult(i: &i32) -> f64 {
+    if i % 4 < 2 {
+        1.
+    }  else {
+        -1.
+    }
+}
+
 impl Operator {
     pub fn get_precedence(&self) -> u8 {
         match self {
@@ -141,31 +149,11 @@ impl Operator {
                 match (a, b) {
                     (Operator::Number { number, x, i }, Operator::Number { number: number_b, x: x_b, i: i_b }) => {
                         if x == x_b && i % 2 == i_b % 2 {
-                            let mult_a = if i % 4 < 2 {
-                                1.
-                            }  else {
-                                -1.
-                            };
-                            let mult_b = if i_b % 4 < 2 {
-                                1.
-                            }  else {
-                                -1.
-                            };
-                            return Some(Operator::Number { number: number * mult_a + number_b * mult_b, x: *x, i: i % 2 })
+                            return Some(Operator::Number { number: number * i_mult(i) + number_b * i_mult(i_b), x: *x, i: i % 2 })
                         } else if number == &0. {
-                            let mult_b = if i_b % 4 < 2 {
-                                1.
-                            }  else {
-                                -1.
-                            };
-                            return Some(Operator::Number { number: number_b * mult_b, x: *x_b, i: i_b % 2 })
+                            return Some(Operator::Number { number: number_b * i_mult(i_b), x: *x_b, i: i_b % 2 })
                         } else if number_b == &0. {
-                            let mult_a = if i % 4 < 2 {
-                                1.
-                            }  else {
-                                -1.
-                            };
-                            return Some(Operator::Number { number: number * mult_a, x: *x, i: i % 2 })
+                            return Some(Operator::Number { number: number * i_mult(i), x: *x, i: i % 2 })
                         }
                         None
                     },
@@ -202,19 +190,14 @@ impl Operator {
                     }
                     (Operator::Number { number, x, i }, Operator::Mat(mat)) | (Operator::Mat(mat), Operator::Number { number, x, i }) => {
                         if *x == 0 && i % 2 == 0 {
-                            let mult = if i % 4 < 2 {
-                                1.
-                            }  else {
-                                -1.
-                            };
                             return Some(Operator::Mat(mat
                                 .iter()
                                 .map(|row| row
                                     .iter()
                                     .map(|ope| if let Operator::Number {number: number_b, ..} = ope {
-                                        Operator::Number { number: number * mult + number_b, x: 0, i: 0 }
+                                        Operator::Number { number: number * i_mult(i) + number_b, x: 0, i: 0 }
                                     } else {
-                                        Operator::Number { number: number * mult, x: 0, i: 0 }
+                                        Operator::Number { number: number * i_mult(i), x: 0, i: 0 }
                                     })
                                     .collect()
                                 ).collect()));
@@ -228,31 +211,85 @@ impl Operator {
                 match (a, b) {
                     (Operator::Number { number, x, i }, Operator::Number { number: number_b, x: x_b, i: i_b }) => {
                         if x == x_b && i % 2 == i_b % 2 {
-                            let mult_a = if i % 4 < 2 {
-                                1.
-                            }  else {
-                                -1.
-                            };
-                            let mult_b = if i_b % 4 < 2 {
-                                1.
-                            }  else {
-                                -1.
-                            };
-                            return Some(Operator::Number { number: number * mult_a - number_b * mult_b, x: *x, i: i % 2 })
+                            return Some(Operator::Number { number: number * i_mult(i) - number_b * i_mult(i_b), x: *x, i: i % 2 })
                         } else if number == &0. {
-                            let mult_b = if i_b % 4 < 2 {
-                                1.
-                            }  else {
-                                -1.
-                            };
-                            return Some(Operator::Number { number: -number_b * mult_b, x: *x_b, i: i_b % 2 })
+                            return Some(Operator::Number { number: -number_b * i_mult(i_b), x: *x_b, i: i_b % 2 })
                         } else if number_b == &0. {
-                            let mult_a = if i % 4 < 2 {
-                                1.
-                            }  else {
-                                -1.
-                            };
-                            return Some(Operator::Number { number: number * mult_a, x: *x, i: i % 2 })
+                            return Some(Operator::Number { number: number * i_mult(i), x: *x, i: i % 2 })
+                        }
+                        None
+                    }
+                    (Operator::Number { number, x, i }, Operator::Mat(mat)) => {
+                        if *x == 0 && i % 2 == 0 {
+                            return Some(Operator::Mat(mat
+                                .iter()
+                                .map(|row| row
+                                    .iter()
+                                    .map(|ope| if let Operator::Number {number: number_b, ..} = ope {
+                                        Operator::Number { number: number * i_mult(i) - number_b, x: 0, i: 0 }
+                                    } else {
+                                        Operator::Number { number: number * i_mult(i), x: 0, i: 0 }
+                                    })
+                                    .collect()
+                                ).collect()));
+                        }
+                        None
+                    }
+                    (a@Self::Mat(_), Self::Number { number, x, i }) => {
+                        Self::Add.calc(a, &Self::Number { number: -number, x: *x, i: *i })
+                    }
+                    _ => unimplemented!(),
+                }
+            },
+            Self::Mult => {
+                match (a, b) {
+                    (Operator::Number { number, x, i }, Operator::Number { number: number_b, x: x_b, i: i_b }) => {
+                        Some(Self::Number { number: number * number_b * i_mult(&(i + i_b)), x: x + x_b, i: (i + i_b) % 2 })
+                    }
+                    (Operator::Mat(mat), Operator::Mat(mat_b)) => {
+                        if mat.len() != mat_b.len() || mat.get(0).is_none() || mat_b.get(0).is_none() || mat.get(0).unwrap().len() != mat_b.get(0).unwrap().len() {
+                            return None   
+                        }
+                        let mut new_mat = Vec::with_capacity(mat.len());
+                        let mut row_id = 0;
+                        for row in mat {
+                            let mut new_row = Vec::with_capacity(row.len());
+                            let mut  ope_id = 0;
+                            for ope in row {
+                                match mat_b.get(row_id) {
+                                    Some(row_b) => {
+                                        match (ope, row_b.get(ope_id)) {
+                                            (a@Self::Number {..}, Some(b@Self::Number {..})) => {
+                                                match Self::Mult.calc(a, b) {
+                                                    Some(x) => new_row.push(x),
+                                                    _ => return None
+                                                }
+                                            },
+                                            _ => return None
+                                        }
+                                    },
+                                    None => return None
+                                }
+                                ope_id += 1;
+                            }
+                            row_id += 1;
+                            new_mat.push(new_row);
+                        }
+                        Some(Self::Mat(new_mat))
+                    }
+                    (Operator::Number { number, x, i }, Operator::Mat(mat)) | (Operator::Mat(mat), Operator::Number { number, x, i }) => {
+                        if *x == 0 && i % 2 == 0 {
+                            return Some(Operator::Mat(mat
+                                .iter()
+                                .map(|row| row
+                                    .iter()
+                                    .map(|ope| if let Operator::Number {number: number_b, ..} = ope {
+                                        Operator::Number { number: number * i_mult(i) * number_b, x: 0, i: 0 }
+                                    } else {
+                                        Operator::Number { number: number * i_mult(i), x: 0, i: 0 }
+                                    })
+                                    .collect()
+                                ).collect()));
                         }
                         None
                     }
