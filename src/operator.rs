@@ -204,7 +204,7 @@ impl Operator {
                         }
                         None
                     }
-                    _ => unimplemented!(),
+                    _ => None,
                 }
             }
             Self::Minus => {
@@ -219,26 +219,43 @@ impl Operator {
                         }
                         None
                     }
-                    (Operator::Number { number, x, i }, Operator::Mat(mat)) => {
+                    (Operator::Number { x, i, .. }, Operator::Mat(mat)) => {
                         if *x == 0 && i % 2 == 0 {
-                            return Some(Operator::Mat(mat
-                                .iter()
-                                .map(|row| row
-                                    .iter()
-                                    .map(|ope| if let Operator::Number {number: number_b, ..} = ope {
-                                        Operator::Number { number: number * i_mult(i) - number_b, x: 0, i: 0 }
-                                    } else {
-                                        Operator::Number { number: number * i_mult(i), x: 0, i: 0 }
-                                    })
-                                    .collect()
-                                ).collect()));
+                            let mut new_mat = Vec::with_capacity(mat.len());
+                            for row in mat {
+                                let mut new_row = Vec::with_capacity(row.len());
+                                for ope in row {
+                                    match Self::Minus.calc(a, ope) {
+                                        Some(x) => new_row.push(x),
+                                        _ => return None
+                                    }
+                                    
+                                }
+                                new_mat.push(new_row);
+                            }
+                            return Some(Self::Mat(new_mat))
                         }
                         None
                     }
-                    (a@Self::Mat(_), Self::Number { number, x, i }) => {
-                        Self::Add.calc(a, &Self::Number { number: -number, x: *x, i: *i })
+                    (Operator::Mat(mat), Operator::Number { x, i, .. }) => {
+                        if *x == 0 && i % 2 == 0 {
+                            let mut new_mat = Vec::with_capacity(mat.len());
+                            for row in mat {
+                                let mut new_row = Vec::with_capacity(row.len());
+                                for ope in row {
+                                    match Self::Minus.calc(ope, b) {
+                                        Some(x) => new_row.push(x),
+                                        _ => return None
+                                    }
+                                    
+                                }
+                                new_mat.push(new_row);
+                            }
+                            return Some(Self::Mat(new_mat))
+                        }
+                        None
                     }
-                    _ => unimplemented!(),
+                    _ => None,
                 }
             },
             Self::Mult => {
@@ -296,16 +313,244 @@ impl Operator {
                         }
                         None
                     }
-                    _ => unimplemented!(),
+                    _ => None,
                 }
             }
-            _ => unimplemented!(),
+            Self::Modulo => {
+                match (a, b) {
+                    (Operator::Number { number, x, i }, Operator::Number { number: number_b, x: x_b, i: i_b }) => {
+                        if *x == 0 && *x_b == 0 && i % 2 == 0 && i_b % 2 == 0 && *number_b != 0. {
+                            return Some(Self::Number { number: number % number_b, x: 0, i: 0 })
+                        }
+                        None
+                    }
+                    (Operator::Mat(mat), Operator::Mat(mat_b)) => {
+                        if mat.len() != mat_b.len() || mat.get(0).is_none() || mat_b.get(0).is_none() || mat.get(0).unwrap().len() != mat_b.get(0).unwrap().len() {
+                            return None   
+                        }
+                        let mut new_mat = Vec::with_capacity(mat.len());
+                        let mut row_id = 0;
+                        for row in mat {
+                            let mut new_row = Vec::with_capacity(row.len());
+                            let mut  ope_id = 0;
+                            for ope in row {
+                                match mat_b.get(row_id) {
+                                    Some(row_b) => {
+                                        match (ope, row_b.get(ope_id)) {
+                                            (a@Self::Number {..}, Some(b@Self::Number {..})) => {
+                                                match Self::Modulo.calc(a, b) {
+                                                    Some(x) => new_row.push(x),
+                                                    _ => return None
+                                                }
+                                            },
+                                            _ => return None
+                                        }
+                                    },
+                                    None => return None
+                                }
+                                ope_id += 1;
+                            }
+                            row_id += 1;
+                            new_mat.push(new_row);
+                        }
+                        Some(Self::Mat(new_mat))
+                    }
+                    (a@Operator::Number { x, i, .. }, Operator::Mat(mat)) => {
+                        if *x == 0 && i % 2 == 0 {
+                            let mut new_mat = Vec::with_capacity(mat.len());
+                            for row in mat {
+                                let mut new_row = Vec::with_capacity(row.len());
+                                for ope in row {
+                                    match Self::Modulo.calc(a, ope) {
+                                        Some(x) => new_row.push(x),
+                                        _ => return None
+                                    }
+                                    
+                                }
+                                new_mat.push(new_row);
+                            }
+                            return Some(Self::Mat(new_mat))
+                        }
+                        None
+                    }
+                    (Operator::Mat(mat), b@Operator::Number { x, i, .. }) => {
+                        if *x == 0 && i % 2 == 0 {
+                            let mut new_mat = Vec::with_capacity(mat.len());
+                            for row in mat {
+                                let mut new_row = Vec::with_capacity(row.len());
+                                for ope in row {
+                                    match Self::Modulo.calc(ope, b) {
+                                        Some(x) => new_row.push(x),
+                                        _ => return None
+                                    }
+                                    
+                                }
+                                new_mat.push(new_row);
+                            }
+                            return Some(Self::Mat(new_mat))
+                        }
+                        None
+                    }
+                    _ => None,
+                }
+            }
+            Self::MatricialMult => {
+                match (a, b) {
+                    (Operator::Mat(mat), Operator::Mat(mat_b)) => {
+                        if mat.get(0).is_none() || mat.get(0).unwrap().len() != mat_b.len() {
+                            return None   
+                        }
+                        let mut new_mat = Vec::new();
+                            for row in mat {
+                            let mut new_row = Vec::new();
+                            for col_id in 0..mat_b.len() {
+                                let mut acc = Self::Number { number: 0., x: 0, i: 0 };
+                                for (i, row_b) in mat_b.iter().enumerate() {
+                                    match Self::Mult.calc(row.get(i).unwrap(), row_b.get(col_id).unwrap()) {
+                                        Some(mult) => match Self::Add.calc(&acc, &mult) {
+                                            Some(new_acc) => acc = new_acc,
+                                            None => return None
+                                        },
+                                        None => return None
+                                    }
+                                }
+                                new_row.push(acc);
+                            }
+                            new_mat.push(new_row);
+                        }
+                        Some(Self::Mat(new_mat))
+                    },
+                    _ => None
+                }
+            }
+            Self::Div => {
+                match (a, b) {
+                    (Operator::Number { number, x, i }, Operator::Number { number: number_b, x: x_b, i: i_b }) => {
+                        if *number_b == 0. {
+                            return None
+                        }
+                        Some(Self::Number { number: (number / number_b) * i_mult(&(i - i_b)), x: x - x_b, i: (i - i_b) % 2 })
+                    }
+                    (Operator::Mat(mat), Operator::Mat(mat_b)) => {
+                        if mat.len() != mat_b.len() || mat.get(0).is_none() || mat_b.get(0).is_none() || mat.get(0).unwrap().len() != mat_b.get(0).unwrap().len() {
+                            return None   
+                        }
+                        let mut new_mat = Vec::with_capacity(mat.len());
+                        let mut row_id = 0;
+                        for row in mat {
+                            let mut new_row = Vec::with_capacity(row.len());
+                            let mut  ope_id = 0;
+                            for ope in row {
+                                match mat_b.get(row_id) {
+                                    Some(row_b) => {
+                                        match (ope, row_b.get(ope_id)) {
+                                            (a@Self::Number {..}, Some(b@Self::Number {..})) => {
+                                                match Self::Div.calc(a, b) {
+                                                    Some(x) => new_row.push(x),
+                                                    _ => return None
+                                                }
+                                            },
+                                            _ => return None
+                                        }
+                                    },
+                                    None => return None
+                                }
+                                ope_id += 1;
+                            }
+                            row_id += 1;
+                            new_mat.push(new_row);
+                        }
+                        Some(Self::Mat(new_mat))
+                    }
+                    (a@Operator::Number { x, i, .. }, Operator::Mat(mat)) => {
+                        if *x == 0 && i % 2 == 0 {
+                            let mut new_mat = Vec::with_capacity(mat.len());
+                            for row in mat {
+                                let mut new_row = Vec::with_capacity(row.len());
+                                for ope in row {
+                                    match Self::Div.calc(a, ope) {
+                                        Some(x) => new_row.push(x),
+                                        _ => return None
+                                    }
+                                    
+                                }
+                                new_mat.push(new_row);
+                            }
+                            return Some(Self::Mat(new_mat))
+                        }
+                        None
+                    }
+                    (Operator::Mat(mat), b@Operator::Number { x, i, .. }) => {
+                        if *x == 0 && i % 2 == 0 {
+                            let mut new_mat = Vec::with_capacity(mat.len());
+                            for row in mat {
+                                let mut new_row = Vec::with_capacity(row.len());
+                                for ope in row {
+                                    match Self::Div.calc(ope, b) {
+                                        Some(x) => new_row.push(x),
+                                        _ => return None
+                                    }
+                                    
+                                }
+                                new_mat.push(new_row);
+                            }
+                            return Some(Self::Mat(new_mat))
+                        }
+                        None
+                    }
+                    _ => None,
+                }
+            }
+            Self::Power => {
+                match (a, b) {
+                    (Self::Number { number, x, i }, Self::Number { number: nb_b, x: x_b, i: i_b }) => {
+                        if *nb_b == 0. {
+                            return Some(Self::Number { number: 1., x: 0, i: 0 })
+                        } else if i_b % 2 != 0  || *x_b != 0 {
+                            return None
+                        }
+                        Some(Self::Number { number: number.powf(*nb_b) * i_mult(&(i * i_b)), x: x * x_b, i: (i * i_b) % 2 })
+                    }
+                    (a@Operator::Number { x, i, .. }, Operator::Mat(mat)) => {
+                        if *x == 0 && i % 2 == 0 {
+                            let mut new_mat = Vec::with_capacity(mat.len());
+                            for row in mat {
+                                let mut new_row = Vec::with_capacity(row.len());
+                                for ope in row {
+                                    match Self::Power.calc(a, ope) {
+                                        Some(x) => new_row.push(x),
+                                        _ => return None
+                                    }
+                                    
+                                }
+                                new_mat.push(new_row);
+                            }
+                            return Some(Self::Mat(new_mat))
+                        }
+                        None
+                    }
+                    (Operator::Mat(_), Operator::Number { x, i, number }) => {
+                        if *x == 0 && i % 2 == 0 {
+                            let mut acc = a.clone();
+                            for _ in 1..number.round() as i64 {
+                                match Self::Power.calc(&acc, a) {
+                                    Some(new_acc) => acc = new_acc,
+                                    _ => return None
+                                }
+                            }
+                            return Some(acc)
+                        }
+                        None
+                    }
+                    _ => None
+                }
+            },
+            _ => None,
         }
     }
 }
 
 
-#[cfg(test)]
 mod matrices {
     use super::*;
 
@@ -409,7 +654,6 @@ mod matrices {
 
 }
 
-#[cfg(test)]
 mod add {
 
     use super::*;
@@ -658,7 +902,6 @@ mod mult {
 }
 
 mod sub {
-
     use super::*;
 
     #[test]
@@ -669,5 +912,17 @@ mod sub {
         assert_eq!(Operator::Minus.calc(&Operator::Number { number: -3., x: 0, i: 0}, &Operator::Number { number: -2., x: 0, i: 0}), Some(Operator::Number { number: -1., x: 0, i: 0}));
         assert_eq!(Operator::Minus.calc(&Operator::Number { number: -3., x: 0, i: 0}, &Operator::Number { number: 1., x: 0, i: 0}), Some(Operator::Number { number: -4., x: 0, i: 0}));
     }
+
+}
+
+mod power {
+
+}
+
+mod div {
+
+}
+
+mod mat_mult {
 
 }
