@@ -255,6 +255,37 @@ impl Operator {
                         }
                         None
                     }
+                    (Operator::Mat(mat), Operator::Mat(mat_b)) => {
+                        if mat.len() != mat_b.len() || mat.get(0).is_none() || mat_b.get(0).is_none() || mat.get(0).unwrap().len() != mat_b.get(0).unwrap().len() {
+                            return None   
+                        }
+                        let mut new_mat = Vec::with_capacity(mat.len());
+                        let mut row_id = 0;
+                        for row in mat {
+                            let mut new_row = Vec::with_capacity(row.len());
+                            let mut  ope_id = 0;
+                            for ope in row {
+                                match mat_b.get(row_id) {
+                                    Some(row_b) => {
+                                        match (ope, row_b.get(ope_id)) {
+                                            (a@Self::Number {..}, Some(b@Self::Number {..})) => {
+                                                match Self::Minus.calc(a, b) {
+                                                    Some(x) => new_row.push(x),
+                                                    _ => return None
+                                                }
+                                            },
+                                            _ => return None
+                                        }
+                                    },
+                                    None => return None
+                                }
+                                ope_id += 1;
+                            }
+                            row_id += 1;
+                            new_mat.push(new_row);
+                        }
+                        Some(Self::Mat(new_mat))
+                    }
                     _ => None,
                 }
             },
@@ -911,6 +942,109 @@ mod sub {
         assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 0, i: 0}, &Operator::Number { number: -2., x: 0, i: 0}), Some(Operator::Number { number: 5., x: 0, i: 0}));
         assert_eq!(Operator::Minus.calc(&Operator::Number { number: -3., x: 0, i: 0}, &Operator::Number { number: -2., x: 0, i: 0}), Some(Operator::Number { number: -1., x: 0, i: 0}));
         assert_eq!(Operator::Minus.calc(&Operator::Number { number: -3., x: 0, i: 0}, &Operator::Number { number: 1., x: 0, i: 0}), Some(Operator::Number { number: -4., x: 0, i: 0}));
+    }
+
+    #[test]
+    fn sub_x() {
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 1, i: 0}, &Operator::Number { number: 4., x: 1, i: 0}), Some(Operator::Number { number: -1., x: 1, i: 0}));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 2, i: 0}, &Operator::Number { number: 4., x: 2, i: 0}), Some(Operator::Number { number: -1., x: 2, i: 0}));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 2, i: 0}, &Operator::Number { number: -4., x: 2, i: 0}), Some(Operator::Number { number: 7., x: 2, i: 0}));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 99, i: 0}, &Operator::Number { number: -4., x: 99, i: 0}), Some(Operator::Number { number: 7., x: 99, i: 0}));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 99, i: 0}, &Operator::Number { number: -4., x: 1, i: 0}), None);
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 99, i: 0}, &Operator::Number { number: -4., x: 98, i: 0}), None);
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 99, i: 0}, &Operator::Number { number: 3., x: 98, i: 0}), None);
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: -1, i: 0}, &Operator::Number { number: 3., x: -2, i: 0}), None);
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: -1, i: 0}, &Operator::Number { number: 3., x: -1, i: 0}), Some(Operator::Number { number: 0., x: -1, i: 0}));
+    }
+
+    #[test]
+    fn sub_i() {
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 0, i: 1}, &Operator::Number { number: 4., x: 0, i: 1}), Some(Operator::Number { number: -1., x: 0, i: 1}));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 0, i: 1}, &Operator::Number { number: 4., x: 0, i: 2}), None);
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 0, i: 0}, &Operator::Number { number: 4., x: 0, i: 2}), Some(Operator::Number { number: 7., x: 0, i: 0}));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 0, i: 0}, &Operator::Number { number: 4., x: 0, i: 98}), Some(Operator::Number { number: 7., x: 0, i: 0}));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 0, i: 1}, &Operator::Number { number: 4., x: 0, i: 3}), Some(Operator::Number { number: 7., x: 0, i: 1}));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 0., x: 0, i: 1}, &Operator::Number { number: 4., x: 0, i: 3}), Some(Operator::Number { number: 4., x: 0, i: 1}));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 0., x: 0, i: 0}, &Operator::Number { number: 4., x: 0, i: 3}), Some(Operator::Number { number: 4., x: 0, i: 1}));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 4., x: 0, i: 3}, &Operator::Number { number: 0., x: 0, i: 3}), Some(Operator::Number { number: -4., x: 0, i: 1}));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 4., x: 0, i: 3}, &Operator::Number { number: 0., x: 0, i: 0}), Some(Operator::Number { number: -4., x: 0, i: 1}));
+    }
+
+    #[test]
+    fn sub_i_x() {
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 1, i: 1}, &Operator::Number { number: 4., x: 1, i: 3}), Some(Operator::Number { number: 7., x: 1, i: 1}));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 1, i: 1}, &Operator::Number { number: 4., x: 0, i: 3}), None);
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 2, i: 1}, &Operator::Number { number: 4., x: 2, i: 3}), Some(Operator::Number { number: 7., x: 2, i: 1}));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 2, i: 2}, &Operator::Number { number: 4., x: 2, i: 0}), Some(Operator::Number { number: -7., x: 2, i: 0}));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 2, i: 4}, &Operator::Number { number: 4., x: 2, i: 0}), Some(Operator::Number { number: -1., x: 2, i: 0}));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 2, i: 4}, &Operator::Number { number: 4., x: 2, i: 4}), Some(Operator::Number { number: -1., x: 2, i: 0}));
+    }
+
+    #[test]
+    fn sub_nb_mat() {
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 0, i: 2}, &Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ])), Some(Operator::Mat(vec![
+            vec![Operator::Number { number: -4., x: 0, i: 0}, Operator::Number { number: -5., x: 0, i: 0}],
+            vec![Operator::Number { number: -6., x: 0, i: 0}, Operator::Number { number: -7., x: 0, i: 0}]
+        ])));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 0, i: 3}, &Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ])), None);
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 1, i: 0}, &Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ])), None);
+        assert_eq!(Operator::Minus.calc(&Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ]), &Operator::Number { number: 3., x: 0, i: 0}), Some(Operator::Mat(vec![
+            vec![Operator::Number { number: -2., x: 0, i: 0}, Operator::Number { number: -1., x: 0, i: 0}],
+            vec![Operator::Number { number: 0., x: 0, i: 0}, Operator::Number { number: 1., x: 0, i: 0}]
+        ])));
+        assert_eq!(Operator::Minus.calc(&Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: -42., x: 0, i: 0}, Operator::Number { number: 3., x: 0, i: 0}],
+            vec![Operator::Number { number: 4., x: 0, i: 0}, Operator::Number { number: 13., x: 0, i: 0}, Operator::Number { number: 6., x: 0, i: 0}],
+            vec![Operator::Number { number: 0., x: 0, i: 0}, Operator::Number { number: 8., x: 0, i: 0}, Operator::Number { number: 9., x: 0, i: 0}]
+        ]), &Operator::Number { number: 42., x: 0, i: 0}), Some(Operator::Mat(vec![
+            vec![Operator::Number { number: -41., x: 0, i: 0}, Operator::Number { number: -84., x: 0, i: 0}, Operator::Number { number: -39., x: 0, i: 0}],
+            vec![Operator::Number { number: -38., x: 0, i: 0}, Operator::Number { number: -29., x: 0, i: 0}, Operator::Number { number: -36., x: 0, i: 0}],
+            vec![Operator::Number { number: -42., x: 0, i: 0}, Operator::Number { number: -34., x: 0, i: 0}, Operator::Number { number: -33., x: 0, i: 0}]
+        ])));
+
+    }
+
+    #[test]
+    fn sub_mat() {
+        assert_eq!(Operator::Minus.calc(&Operator::Mat(vec![
+            vec![Operator::Number { number: 99., x: 0, i: 0}, Operator::Number { number: 98., x: 0, i: 0}],
+            vec![Operator::Number { number: 97., x: 0, i: 0}, Operator::Number { number: 96., x: 0, i: 0}]
+        ]), &Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ])), Some(Operator::Mat(vec![
+            vec![Operator::Number { number: 98., x: 0, i: 0}, Operator::Number { number: 96., x: 0, i: 0}],
+            vec![Operator::Number { number: 94., x: 0, i: 0}, Operator::Number { number: 92., x: 0, i: 0}]
+        ])));
+        assert_eq!(Operator::Minus.calc(&Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 213., x: 0, i: 0}, Operator::Number { number: 0., x: 0, i: 0}],
+            vec![Operator::Number { number: -9., x: 0, i: 0}, Operator::Number { number: -92., x: 0, i: 0}, Operator::Number { number: -24., x: 0, i: 0}]
+        ]), &Operator::Mat(vec![
+            vec![Operator::Number { number: 123., x: 0, i: 0}, Operator::Number { number: 22., x: 0, i: 0}, Operator::Number { number: -22., x: 0, i: 0}],
+            vec![Operator::Number { number: 982., x: 0, i: 0}, Operator::Number { number: 41., x: 0, i: 0}, Operator::Number { number: -42., x: 0, i: 0}]
+        ])), Some(Operator::Mat(vec![
+            vec![Operator::Number { number: -122., x: 0, i: 0}, Operator::Number { number: 191., x: 0, i: 0}, Operator::Number { number: 22., x: 0, i: 0}],
+            vec![Operator::Number { number: -991., x: 0, i: 0}, Operator::Number { number: -133., x: 0, i: 0}, Operator::Number { number: 18., x: 0, i: 0}]
+        ])));
+        assert_eq!(Operator::Minus.calc(&Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 213., x: 0, i: 0}, Operator::Number { number: 0., x: 0, i: 0}],
+            vec![Operator::Number { number: -9., x: 0, i: 0}, Operator::Number { number: -92., x: 0, i: 0}, Operator::Number { number: -24., x: 0, i: 0}]
+        ]), &Operator::Mat(vec![
+            vec![Operator::Number { number: 22., x: 0, i: 0}, Operator::Number { number: -22., x: 0, i: 0}],
+            vec![Operator::Number { number: 982., x: 0, i: 0}, Operator::Number { number: 41., x: 0, i: 0}, Operator::Number { number: -42., x: 0, i: 0}]
+        ])), None);
     }
 
 }
