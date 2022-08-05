@@ -27,7 +27,7 @@ impl Operator {
     pub fn get_precedence(&self) -> u8 {
         match self {
             Operator::Add | Operator::Minus => 2,
-            Operator::Mult | Operator::Div => 3,
+            Operator::Mult | Operator::Div | Operator::Modulo | Operator::MatricialMult => 3,
             Operator::Power => 4,
             Operator::CloseParenthesis | Operator::OpenParenthesis => 1,
             _ => unreachable!()
@@ -535,12 +535,14 @@ impl Operator {
             Self::Power => {
                 match (a, b) {
                     (Self::Number { number, x, i }, Self::Number { number: nb_b, x: x_b, i: i_b }) => {
-                        if *nb_b == 0. {
+                        if *nb_b == 0. && *number == 0. {
+                            return None
+                        } else if *nb_b == 0. {
                             return Some(Self::Number { number: 1., x: 0, i: 0 })
                         } else if i_b % 2 != 0  || *x_b != 0 {
                             return None
                         }
-                        Some(Self::Number { number: number.powf(*nb_b) * i_mult(&(i * i_b)), x: x * x_b, i: (i * i_b) % 2 })
+                        Some(Self::Number { number: (number * i_mult(i)).powf(nb_b * i_mult(i_b)), x: x * nb_b.round() as i32 * i_mult(i_b) as i32, i: (i * i_b) % 2 })
                     }
                     (a@Operator::Number { x, i, .. }, Operator::Mat(mat)) => {
                         if *x == 0 && i % 2 == 0 {
@@ -564,7 +566,7 @@ impl Operator {
                         if *x == 0 && i % 2 == 0 {
                             let mut acc = a.clone();
                             for _ in 1..number.round() as i64 {
-                                match Self::Power.calc(&acc, a) {
+                                match Self::MatricialMult.calc(&acc, a) {
                                     Some(new_acc) => acc = new_acc,
                                     _ => return None
                                 }
@@ -1050,6 +1052,94 @@ mod sub {
 }
 
 mod power {
+    use super::*;
+
+    #[test]
+    fn power_simple() {
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 0., x: 0, i: 0}, &Operator::Number { number: 0., x: 0, i: 0}), None);
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 0., x: 0, i: 0}, &Operator::Number { number: 4., x: 0, i: 0}), Some(Operator::Number { number: 0., x: 0, i: 0}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 0, i: 0}, &Operator::Number { number: 2., x: 0, i: 0}), Some(Operator::Number { number: 9., x: 0, i: 0}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 0, i: 0}, &Operator::Number { number: -2., x: 0, i: 0}), Some(Operator::Number { number: 0.1111111111111111, x: 0, i: 0}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: -3., x: 0, i: 0}, &Operator::Number { number: -2., x: 0, i: 0}), Some(Operator::Number { number: 0.1111111111111111, x: 0, i: 0}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: -3., x: 0, i: 0}, &Operator::Number { number: 1., x: 0, i: 0}), Some(Operator::Number { number: -3., x: 0, i: 0}));
+    }
+
+    #[test]
+    fn power_x() {
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 1, i: 0}, &Operator::Number { number: 4., x: 1, i: 0}), None);
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 2, i: 0}, &Operator::Number { number: 4., x: 2, i: 0}), None);
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 2, i: 0}, &Operator::Number { number: -4., x: 2, i: 0}), None);
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 2, i: 0}, &Operator::Number { number: 4., x: 0, i: 0}), Some(Operator::Number { number: 81., x: 8, i: 0}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 2, i: 0}, &Operator::Number { number: -4., x: 0, i: 0}), Some(Operator::Number { number: 0.01234567901234567901234, x: -8, i: 0}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 1, i: 0}, &Operator::Number { number: 2., x: 0, i: 0}), Some(Operator::Number { number: 9., x: 2, i: 0}));
+    }
+
+    #[test]
+    fn power_i() {
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 0, i: 1}, &Operator::Number { number: 4., x: 0, i: 1}), None);
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 0, i: 1}, &Operator::Number { number: 4., x: 0, i: 2}), Some(Operator::Number { number: 0.0123456790123456790123456790123456790123456790123456790123456790, x: 0, i: 0}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 0, i: 0}, &Operator::Number { number: 2., x: 0, i: 2}), Some(Operator::Number { number: 0.1111111111111111, x: 0, i: 0}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 0, i: 0}, &Operator::Number { number: 2., x: 0, i: 98}), Some(Operator::Number { number: 0.1111111111111111, x: 0, i: 0}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 0, i: 1}, &Operator::Number { number: 4., x: 0, i: 3}), None);
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 0., x: 0, i: 1}, &Operator::Number { number: 4., x: 0, i: 3}), None);
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 0., x: 0, i: 0}, &Operator::Number { number: 4., x: 0, i: 3}), None);
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 4., x: 0, i: 3}, &Operator::Number { number: 0., x: 0, i: 3}), Some(Operator::Number { number: 1., x: 0, i: 0}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 4., x: 0, i: 3}, &Operator::Number { number: 0., x: 0, i: 0}), Some(Operator::Number { number: 1., x: 0, i: 0}));
+    }
+
+    #[test]
+    fn power_i_x() {
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 1, i: 1}, &Operator::Number { number: 4., x: 1, i: 3}), None);
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 1, i: 1}, &Operator::Number { number: 4., x: 0, i: 3}), None);
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 2, i: 1}, &Operator::Number { number: 4., x: 0, i: 2}), Some(Operator::Number { number: 0.0123456790123456790123456790123456790123456790123456790123456790, x: -8, i: 0}));
+    }
+
+    #[test]
+    fn power_nb_mat() {
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 0, i: 2}, &Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ])), Some(Operator::Mat(vec![
+            vec![Operator::Number { number: -3., x: 0, i: 0}, Operator::Number { number: 9., x: 0, i: 0}],
+            vec![Operator::Number { number: -27., x: 0, i: 0}, Operator::Number { number: 81., x: 0, i: 0}]
+        ])));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 0, i: 3}, &Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ])), None);
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 1, i: 0}, &Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ])), None);
+        assert_eq!(Operator::Power.calc(&Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ]), &Operator::Number { number: 3., x: 0, i: 0}), Some(Operator::Mat(vec![
+            vec![Operator::Number { number: 37., x: 0, i: 0}, Operator::Number { number: 54., x: 0, i: 0}],
+            vec![Operator::Number { number: 81., x: 0, i: 0}, Operator::Number { number: 118., x: 0, i: 0}]
+        ])));
+        assert_eq!(Operator::Power.calc(&Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: -42., x: 0, i: 0}, Operator::Number { number: 3., x: 0, i: 0}],
+            vec![Operator::Number { number: 4., x: 0, i: 0}, Operator::Number { number: 13., x: 0, i: 0}, Operator::Number { number: 6., x: 0, i: 0}],
+            vec![Operator::Number { number: 0., x: 0, i: 0}, Operator::Number { number: 8., x: 0, i: 0}, Operator::Number { number: 9., x: 0, i: 0}]
+        ]), &Operator::Number { number: 42., x: 0, i: 0}), Some(Operator::Mat(vec![
+            vec![Operator::Number { number: -1.7708902764748768e46, x: 0, i: 0}, Operator::Number { number: -5.270424995261516e46, x: 0, i: 0}, Operator::Number { number: -9.177255146024434e46, x: 0, i: 0}],
+            vec![Operator::Number { number: 5.85202005175608e45, x: 0, i: 0}, Operator::Number { number: 1.7331078572167e46, x: 0, i: 0}, Operator::Number { number: 3.06329315546935e46, x: 0, i: 0}],
+            vec![Operator::Number { number: 1.1655947454431686e46, x: 0, i: 0}, Operator::Number { number: 3.501593501237555e46, x: 0, i: 0}, Operator::Number { number: 6.101683520174558e46, x: 0, i: 0}]
+        ])));
+
+    }
+
+    #[test]
+    fn power_mat() {
+        assert_eq!(Operator::Power.calc(&Operator::Mat(vec![
+            vec![Operator::Number { number: 99., x: 0, i: 0}, Operator::Number { number: 98., x: 0, i: 0}],
+            vec![Operator::Number { number: 97., x: 0, i: 0}, Operator::Number { number: 96., x: 0, i: 0}]
+        ]), &Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ])), None);
+    }
 
 }
 
@@ -1058,5 +1148,9 @@ mod div {
 }
 
 mod mat_mult {
+
+}
+
+mod modulo {
 
 }

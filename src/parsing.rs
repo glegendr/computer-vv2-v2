@@ -5,7 +5,7 @@ pub fn parse_line(line: &str) -> Result<Vec<Operator>, String> {
     let mut saved = String::default();
     let mut operators: Vec<Operator> = Vec::default();
     for c in line.chars() {
-        if !"+-()%^*=?".contains(c) || String::from(c).parse::<u8>().is_ok() {
+        if !"+-()%^*=?/".contains(c) || String::from(c).parse::<u8>().is_ok() {
             saved.push(c);
         } else {
             if !saved.trim().is_empty() {
