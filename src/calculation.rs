@@ -32,7 +32,7 @@ pub fn calc(input: &Vec<Operator>) -> Result<Vec<Operator>, String> {
         }
     }
     
-    println!("calc: {ret:?}");
+    // println!("calc: {ret:?}");
 
     if changed {
         return calc(&ret)

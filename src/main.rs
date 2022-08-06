@@ -60,7 +60,7 @@ fn main() -> rustyline::Result<()> {
                                 // Calculation
                             }
                         }
-                        println!("{splitted:?}");
+                        // println!("{splitted:?}");
                     },
                 }
             },

@@ -8,6 +8,17 @@ pub fn parse_line(line: &str) -> Result<Vec<Operator>, String> {
         if !"+-()%^*=?/".contains(c) || String::from(c).parse::<u8>().is_ok() {
             saved.push(c);
         } else {
+            if saved.is_empty() && c == '*' {
+                match operators.pop() {
+                    Some(Operator::Mult) => {
+                        operators.push(Operator::MatricialMult);
+                        continue
+                    },
+                    Some(ope) => operators.push(ope),
+                    None => {}
+                }
+            }
+
             if !saved.trim().is_empty() {
                 operators.push(Operator::from_str(&saved)?);
                 saved.clear();
