@@ -350,8 +350,10 @@ impl Operator {
             Self::Modulo => {
                 match (a, b) {
                     (Operator::Number { number, x, i }, Operator::Number { number: number_b, x: x_b, i: i_b }) => {
-                        if *x == 0 && *x_b == 0 && i % 2 == 0 && i_b % 2 == 0 && *number_b != 0. {
-                            return Some(Self::Number { number: number % number_b, x: 0, i: 0 })
+                        if *number_b == 1. {
+                            return Some(Self::Number { number: 0., x: 0, i: 0 })
+                        } else if *x == 0 && *x_b == 0 && i % 2 == 0 && i_b % 2 == 0 && *number_b != 0. {
+                            return Some(Self::Number { number: number.rem_euclid(*number_b), x: 0, i: 0 })
                         }
                         None
                     }
@@ -434,7 +436,7 @@ impl Operator {
                         let mut new_mat = Vec::new();
                             for row in mat {
                             let mut new_row = Vec::new();
-                            for col_id in 0..mat_b.len() {
+                            for col_id in 0..mat_b.get(0).unwrap().len() {
                                 let mut acc = Self::Number { number: 0., x: 0, i: 0 };
                                 for (i, row_b) in mat_b.iter().enumerate() {
                                     match Self::Mult.calc(row.get(i).unwrap(), row_b.get(col_id).unwrap()) {
@@ -459,8 +461,10 @@ impl Operator {
                     (Operator::Number { number, x, i }, Operator::Number { number: number_b, x: x_b, i: i_b }) => {
                         if *number_b == 0. {
                             return None
+                        } else if *number == 0. {
+                            return Some(Self::Number { number: 0. , x: 0, i: 0 })
                         }
-                        Some(Self::Number { number: (number * i_mult(i)) / (number_b * i_mult(i_b)) , x: x - x_b, i: (i - i_b) % 2 })
+                        Some(Self::Number { number: (number * i_mult(i)) / (number_b * i_mult(i_b)) , x: x - x_b, i: i % 2 - i_b % 2 })
                     }
                     (Operator::Mat(mat), Operator::Mat(mat_b)) => {
                         if mat.len() != mat_b.len() || mat.get(0).is_none() || mat_b.get(0).is_none() || mat.get(0).unwrap().len() != mat_b.get(0).unwrap().len() {
@@ -1238,10 +1242,185 @@ mod div {
 
 }
 
-mod mat_mult {
+mod modulo {
+    use super::*;
+
+    #[test]
+    fn modulo_simple() {
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 0., x: 0, i: 0}, &Operator::Number { number: 0., x: 0, i: 0}), None);
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 1., x: 0, i: 0}, &Operator::Number { number: 0., x: 0, i: 0}), None);
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 0., x: 0, i: 0}, &Operator::Number { number: 4., x: 0, i: 0}), Some(Operator::Number { number: 0., x: 0, i: 0}));
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 0, i: 0}, &Operator::Number { number: 2., x: 0, i: 0}), Some(Operator::Number { number: 1., x: 0, i: 0}));
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 0, i: 0}, &Operator::Number { number: 2., x: 0, i: 0}), Some(Operator::Number { number: 1., x: 0, i: 0}));
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: -3., x: 0, i: 0}, &Operator::Number { number: 2., x: 0, i: 0}), Some(Operator::Number { number: 1., x: 0, i: 0}));
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: -3., x: 0, i: 0}, &Operator::Number { number: 1., x: 0, i: 0}), Some(Operator::Number { number: 0., x: 0, i: 0}));
+    }
+
+    #[test]
+    fn modulo_x() {
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 1, i: 0}, &Operator::Number { number: 4., x: 1, i: 0}), None);
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 2, i: 0}, &Operator::Number { number: 4., x: 2, i: 0}), None);
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 2, i: 0}, &Operator::Number { number: 4., x: 0, i: 0}), None);
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 2, i: 0}, &Operator::Number { number: 4., x: 0, i: 0}), None);
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 1, i: 0}, &Operator::Number { number: 2., x: 0, i: 0}), None);
+    }
+
+    #[test]
+    fn modulo_i() {
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 0, i: 1}, &Operator::Number { number: 4., x: 0, i: 1}), None);
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 0, i: 1}, &Operator::Number { number: 4., x: 0, i: 2}), None);
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 0, i: 0}, &Operator::Number { number: 2., x: 0, i: 2}), Some(Operator::Number { number: 1., x: 0, i: 0 }));
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 0, i: 0}, &Operator::Number { number: 2., x: 0, i: 98}), Some(Operator::Number { number: 1., x: 0, i: 0 }));
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 0, i: 1}, &Operator::Number { number: 4., x: 0, i: 3}), None);
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 0., x: 0, i: 1}, &Operator::Number { number: 4., x: 0, i: 3}), None);
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 0., x: 0, i: 0}, &Operator::Number { number: 4., x: 0, i: 3}), None);
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 4., x: 0, i: 3}, &Operator::Number { number: 0., x: 0, i: 3}), None);
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 4., x: 0, i: 3}, &Operator::Number { number: 0., x: 0, i: 0}), None);
+    }
+
+    #[test]
+    fn modulo_i_x() {
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 1, i: 1}, &Operator::Number { number: 4., x: 1, i: 3}),  None);
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 1, i: 1}, &Operator::Number { number: 4., x: 0, i: 3}), None);
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 2, i: 1}, &Operator::Number { number: 4., x: 0, i: 2}), None);
+    }
+
+    #[test]
+    fn modulo_nb_mat() {
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 0, i: 2}, &Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ])), Some(Operator::Mat(vec![
+            vec![Operator::Number { number: 0., x: 0, i: 0}, Operator::Number { number: 1., x: 0, i: 0}],
+            vec![Operator::Number { number: 0., x: 0, i: 0}, Operator::Number { number: 3., x: 0, i: 0}]
+        ])));
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 0, i: 3}, &Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ])), None);
+        assert_eq!(Operator::Modulo.calc(&Operator::Number { number: 3., x: 1, i: 0}, &Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ])), None);
+        assert_eq!(Operator::Modulo.calc(&Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ]), &Operator::Number { number: 3., x: 0, i: 0}), Some(Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 0., x: 0, i: 0}, Operator::Number { number: 1., x: 0, i: 0}]
+        ])));
+        assert_eq!(Operator::Modulo.calc(&Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: -42., x: 0, i: 0}, Operator::Number { number: 3., x: 0, i: 0}],
+            vec![Operator::Number { number: 4., x: 0, i: 0}, Operator::Number { number: 13., x: 0, i: 0}, Operator::Number { number: 6., x: 0, i: 0}],
+            vec![Operator::Number { number: 0., x: 0, i: 0}, Operator::Number { number: 8., x: 0, i: 0}, Operator::Number { number: 9., x: 0, i: 0}]
+        ]), &Operator::Number { number: 7., x: 0, i: 0}), Some(Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 0., x: 0, i: 0}, Operator::Number { number: 3., x: 0, i: 0}],
+            vec![Operator::Number { number: 4., x: 0, i: 0}, Operator::Number { number: 6., x: 0, i: 0}, Operator::Number { number: 6., x: 0, i: 0}],
+            vec![Operator::Number { number: 0., x: 0, i: 0}, Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number:2., x: 0, i: 0}]
+        ])));
+
+    }
+
+    #[test]
+    fn modulo_mat() {
+        assert_eq!(Operator::Modulo.calc(&Operator::Mat(vec![
+            vec![Operator::Number { number: 99., x: 0, i: 0}, Operator::Number { number: 98., x: 0, i: 0}],
+            vec![Operator::Number { number: 97., x: 0, i: 0}, Operator::Number { number: 96., x: 0, i: 0}]
+        ]), &Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ])), Some(Operator::Mat(vec![
+            vec![Operator::Number { number: 0., x: 0, i: 0}, Operator::Number { number: 0., x: 0, i: 0}],
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 0., x: 0, i: 0}]
+        ])));
+    }
 
 }
 
-mod modulo {
+mod mat_mult {
+    use super::*;
 
+    #[test]
+    fn mat_mult() {
+        assert_eq!(Operator::MatricialMult.calc(&Operator::Mat(vec![
+            vec![Operator::Number { number: 99., x: 0, i: 0}, Operator::Number { number: 98., x: 0, i: 0}],
+            vec![Operator::Number { number: 97., x: 0, i: 0}, Operator::Number { number: 96., x: 0, i: 0}]
+        ]), &Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ])), Some(Operator::Mat(vec![
+            vec![Operator::Number { number: 393., x: 0, i: 0}, Operator::Number { number: 590., x: 0, i: 0}],
+            vec![Operator::Number { number: 385., x: 0, i: 0}, Operator::Number { number: 578., x: 0, i: 0}]
+        ])));
+
+        assert_eq!(Operator::MatricialMult.calc(&Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}],
+            vec![Operator::Number { number: 5., x: 0, i: 0}, Operator::Number { number: 6., x: 0, i: 0}, Operator::Number { number: 7., x: 0, i: 0}]
+        ]), &Operator::Mat(vec![
+            vec![Operator::Number { number: 0., x: 0, i: 0}, Operator::Number { number: 9., x: 0, i: 0}],
+            vec![Operator::Number { number: 8., x: 0, i: 0}, Operator::Number { number: 7., x: 0, i: 0}],
+            vec![Operator::Number { number: 6., x: 0, i: 0}, Operator::Number { number: 5., x: 0, i: 0}]
+        ])), Some(Operator::Mat(vec![
+            vec![Operator::Number { number: 48., x: 0, i: 0}, Operator::Number { number: 50., x: 0, i: 0}],
+            vec![Operator::Number { number: 90., x: 0, i: 0}, Operator::Number { number: 122., x: 0, i: 0}]
+        ])));
+
+        assert_eq!(Operator::MatricialMult.calc(&Operator::Mat(vec![
+            vec![Operator::Number { number: 0., x: 0, i: 0}, Operator::Number { number: 9., x: 0, i: 0}],
+            vec![Operator::Number { number: 8., x: 0, i: 0}, Operator::Number { number: 7., x: 0, i: 0}],
+            vec![Operator::Number { number: 6., x: 0, i: 0}, Operator::Number { number: 5., x: 0, i: 0}]
+        ]),
+            &Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}],
+            vec![Operator::Number { number: 5., x: 0, i: 0}, Operator::Number { number: 6., x: 0, i: 0}, Operator::Number { number: 7., x: 0, i: 0}]
+        ])), Some(Operator::Mat(vec![
+            vec![Operator::Number { number: 45., x: 0, i: 0}, Operator::Number { number: 54., x: 0, i: 0}, Operator::Number { number: 63., x: 0, i: 0}],
+            vec![Operator::Number { number: 43., x: 0, i: 0}, Operator::Number { number: 66., x: 0, i: 0}, Operator::Number { number: 81., x: 0, i: 0}],
+            vec![Operator::Number { number: 31., x: 0, i: 0}, Operator::Number { number: 48., x: 0, i: 0}, Operator::Number { number: 59., x: 0, i: 0}]
+        ])));
+
+        assert_eq!(Operator::MatricialMult.calc(&Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}],
+            vec![Operator::Number { number: 5., x: 0, i: 0}, Operator::Number { number: 6., x: 0, i: 0}, Operator::Number { number: 7., x: 0, i: 0}]
+        ]), &Operator::Mat(vec![
+            vec![Operator::Number { number: 0., x: 0, i: 0}],
+            vec![Operator::Number { number: 8., x: 0, i: 0}],
+            vec![Operator::Number { number: 6., x: 0, i: 0}]
+        ])), Some(Operator::Mat(vec![
+            vec![Operator::Number { number: 48., x: 0, i: 0}],
+            vec![Operator::Number { number: 90., x: 0, i: 0}]
+        ])));
+    }
+    
+    #[test]
+    fn mat_mult_bad() {
+        assert_eq!(Operator::MatricialMult.calc(&Operator::Mat(vec![
+            vec![Operator::Number { number: 99., x: 0, i: 0}, Operator::Number { number: 98., x: 0, i: 0}],
+            vec![Operator::Number { number: 97., x: 0, i: 0}, Operator::Number { number: 96., x: 0, i: 0}]
+            ]),
+            &Operator::Number { number: 1., x: 0, i: 0}),
+            None
+        );
+        
+        assert_eq!(Operator::MatricialMult.calc(&Operator::Number { number: 1., x: 0, i: 0},
+            &Operator::Mat(vec![
+            vec![Operator::Number { number: 99., x: 0, i: 0}, Operator::Number { number: 98., x: 0, i: 0}],
+            vec![Operator::Number { number: 97., x: 0, i: 0}, Operator::Number { number: 96., x: 0, i: 0}]
+            ])),
+            None
+        );
+
+        assert_eq!(Operator::MatricialMult.calc(&Operator::Mat(vec![
+                vec![Operator::Number { number: 0., x: 0, i: 0}, Operator::Number { number: 9., x: 0, i: 0}],
+                vec![Operator::Number { number: 8., x: 0, i: 0}, Operator::Number { number: 7., x: 0, i: 0}],
+                vec![Operator::Number { number: 6., x: 0, i: 0}, Operator::Number { number: 5., x: 0, i: 0}]
+            ]),
+            &Operator::Mat(vec![
+                vec![Operator::Number { number: 0., x: 0, i: 0}, Operator::Number { number: 9., x: 0, i: 0}],
+                vec![Operator::Number { number: 8., x: 0, i: 0}, Operator::Number { number: 7., x: 0, i: 0}],
+                vec![Operator::Number { number: 6., x: 0, i: 0}, Operator::Number { number: 5., x: 0, i: 0}]
+            ])),
+            None
+        );
+    }
 }
