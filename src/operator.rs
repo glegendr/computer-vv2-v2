@@ -1,18 +1,29 @@
+use std::fmt;
 #[derive(Clone, Debug, PartialEq)]
 pub enum Operator {
+    // variables
     Var(String),
     Number { number: f64, x: i32, i: i32 },
     Mat(Vec<Vec<Operator>>),
+    // Operators
     Add,
     Minus,
     Mult,
     MatricialMult,
     Modulo,
     Power,
+    Div,
+    // Other
     OpenParenthesis,
     CloseParenthesis,
-    Div,
     Equal
+}
+
+
+impl fmt::Display for Operator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
 }
 
 fn i_mult(i: &i32) -> f64 {
@@ -24,6 +35,57 @@ fn i_mult(i: &i32) -> f64 {
 }
 
 impl Operator {
+
+    pub fn to_string(&self) -> String {
+        match self {
+            Self::Var(name) => String::from(name),
+            Self::Number {number, x, i} => {
+                let mut ret = String::new();
+                if *number == -1. && (*x != 0 || *i != 0) {
+                    ret = format!("-");
+                } else if !(*number == 1. && (*x != 0 || *i != 0)) {
+                    ret = format!("{number}");
+                }
+                match x {
+                    0 => {},
+                    1 => ret = format!("{ret}x"),
+                    _ => ret = format!("{ret}x^{x}")
+                }
+                match i {
+                    0 => {},
+                    1 => ret = format!("{ret}i"),
+                    _ => ret = format!("{ret}i^{i}")
+                }
+                ret
+            }
+            Self::Mat(mat) => {
+                let mut ret = String::new();
+                for row in mat {
+                    let mut row_ret = String::new();
+                    for ope in row {
+                        row_ret = format!("{row_ret}{ope}, ");
+                    }
+                    row_ret.pop();
+                    row_ret.pop();
+                    ret = format!("{ret}[{row_ret}]; ");
+                }
+                ret.pop();
+                ret.pop();
+                format!("[{ret}]")
+            }
+            Self::Add => String::from("+"),
+            Self::Minus => String::from("-"),
+            Self::Mult => String::from("*"),
+            Self::Div => String::from("/"),
+            Self::MatricialMult => String::from("**"),
+            Self::Modulo => String::from("%"),
+            Self::OpenParenthesis => String::from("("),
+            Self::CloseParenthesis => String::from(")"),
+            Self::Equal => String::from("="),
+            Self::Power => String::from("^")
+        }
+    } 
+
     pub fn get_precedence(&self) -> u8 {
         match self {
             Operator::Add | Operator::Minus => 2,
@@ -124,7 +186,7 @@ impl Operator {
                                 },
                                 _ => {}
                             }
-                        } else if let Ok(nb) = string.trim().parse::<f64>() {
+                        } else if let Ok(_nb) = string.trim().parse::<f64>() {
                             // println!("{:?}", Operator::Number { number: nb, x: 0, i: 0 });
                         }
                     }
@@ -589,6 +651,7 @@ impl Operator {
 
 
 mod matrices {
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]
@@ -693,6 +756,7 @@ mod matrices {
 
 mod add {
 
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]
@@ -811,6 +875,7 @@ mod add {
 
 mod mult {
 
+    #[allow(unused_imports)]
     use super::*;
     
     #[test]
@@ -939,6 +1004,7 @@ mod mult {
 }
 
 mod sub {
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]
@@ -1056,6 +1122,7 @@ mod sub {
 }
 
 mod power {
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]
@@ -1148,6 +1215,7 @@ mod power {
 }
 
 mod div {
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]
@@ -1243,6 +1311,7 @@ mod div {
 }
 
 mod modulo {
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]
@@ -1338,6 +1407,7 @@ mod modulo {
 }
 
 mod mat_mult {
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]

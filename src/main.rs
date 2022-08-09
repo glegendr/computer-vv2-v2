@@ -1,19 +1,19 @@
+use std::collections::HashMap;
+
 use rustyline::Editor;
 mod assignation;
 mod parsing;
 mod operator;
-mod global;
 mod calculation;
-
-#[macro_use]
-extern crate lazy_static;
+mod btree;
 
 use crate::operator::Operator;
-use crate::assignation::assign;
+use crate::assignation::{assign, to_printable_string};
 use crate::parsing::parse_line;  
 
 fn main() -> rustyline::Result<()> {
     // `()` can be used when no completer is required
+    let mut variables = HashMap::new();
     let mut rl = Editor::<()>::new()?;
     loop {
         let readline = rl.readline("> ");
@@ -23,6 +23,16 @@ fn main() -> rustyline::Result<()> {
                     continue
                 }
                 rl.add_history_entry(line.as_str());
+                match line.trim_end() {
+                    "/list" => {
+                        for (key, value) in &variables {
+                            println!("{key} = {}", to_printable_string(value));
+                        }
+                        continue
+                    },
+                    _ => {}
+                }
+
                 match parse_line(line.as_str()) {
                     Err(e) => println!("{e}"),
                     Ok(operators) => {
@@ -55,7 +65,7 @@ fn main() -> rustyline::Result<()> {
                                 println!("{e}");
                                 continue
                             }
-                            Ok(0) => assign(&splitted),
+                            Ok(0) => assign(&splitted, &mut variables),
                             _ => {
                                 // Calculation
                             }

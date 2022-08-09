@@ -1,6 +1,6 @@
 use crate::operator::Operator;
 
-
+// TODO 3 * -1
 pub fn parse_line(line: &str) -> Result<Vec<Operator>, String> {
     let mut saved = String::default();
     let mut operators: Vec<Operator> = Vec::default();
