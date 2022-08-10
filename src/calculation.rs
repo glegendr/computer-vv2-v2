@@ -1,12 +1,13 @@
-use crate::operator::Operator;
+use crate::{operator::Operator, btree::BTree};
 
 pub fn calc(input: &Vec<Operator>) -> Result<Vec<Operator>, String> {
     let mut changed = false;
     let mut ret: Vec<Operator> = Vec::new();
-
+    let tree = BTree::from_vec(&input)?;
+    tree.eval()?;
     for ope in input {
         match ope {
-            Operator::Var(_name) => unimplemented!(),
+            Operator::Var(name) => return Err(format!("Unknown variable {name}")),
             Operator::Number {..} | Operator::Mat(_) => ret.push(ope.clone()),
             Operator::Add | Operator::Minus | Operator::Mult | Operator::Modulo | Operator::MatricialMult | Operator::Power | Operator::Div => {
                 match ret.pop() {

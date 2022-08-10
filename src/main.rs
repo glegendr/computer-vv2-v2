@@ -15,6 +15,7 @@ fn main() -> rustyline::Result<()> {
     // `()` can be used when no completer is required
     let mut variables = HashMap::new();
     let mut rl = Editor::<()>::new()?;
+    _ = rl.load_history("history.txt");
     loop {
         let readline = rl.readline("> ");
         match readline {
@@ -79,5 +80,5 @@ fn main() -> rustyline::Result<()> {
             }
         }
     }
-    Ok(())
+    rl.save_history("history.txt")
 }
