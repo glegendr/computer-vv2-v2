@@ -211,7 +211,11 @@ impl Operator {
                 match (a, b) {
                     (Operator::Number { number, x, i }, Operator::Number { number: number_b, x: x_b, i: i_b }) => {
                         if x == x_b && i % 2 == i_b % 2 {
-                            return Some(Operator::Number { number: number * i_mult(i) + number_b * i_mult(i_b), x: *x, i: i % 2 })
+                            let res = number * i_mult(i) + number_b * i_mult(i_b);
+                            if res == 0. {
+                                return Some(Operator::Number { number: 0., x: 0, i: 0 })
+                            }
+                            return Some(Operator::Number { number: res, x: *x, i: i % 2 })
                         } else if number == &0. {
                             return Some(Operator::Number { number: number_b * i_mult(i_b), x: *x_b, i: i_b % 2 })
                         } else if number_b == &0. {
@@ -273,7 +277,11 @@ impl Operator {
                 match (a, b) {
                     (Operator::Number { number, x, i }, Operator::Number { number: number_b, x: x_b, i: i_b }) => {
                         if x == x_b && i % 2 == i_b % 2 {
-                            return Some(Operator::Number { number: number * i_mult(i) - number_b * i_mult(i_b), x: *x, i: i % 2 })
+                            let res = number * i_mult(i) - number_b * i_mult(i_b);
+                            if res == 0. {
+                                return Some(Operator::Number { number: 0., x: 0, i: 0 })
+                            }
+                            return Some(Operator::Number { number: res, x: *x, i: i % 2 })
                         } else if number == &0. {
                             return Some(Operator::Number { number: -number_b * i_mult(i_b), x: *x_b, i: i_b % 2 })
                         } else if number_b == &0. {
@@ -406,13 +414,19 @@ impl Operator {
                         }
                         None
                     }
+                    (Operator::Number { number, .. }, _) | (_, Operator::Number { number, .. }) => {
+                        if *number == 0. {
+                            return Some(Operator::Number { number: 0., x: 0, i: 0 })
+                        }
+                        None
+                    }
                     _ => None,
                 }
             }
             Self::Modulo => {
                 match (a, b) {
                     (Operator::Number { number, x, i }, Operator::Number { number: number_b, x: x_b, i: i_b }) => {
-                        if *number_b == 1. {
+                        if *number_b == 1. && *i_b % 2 == 0 && *x_b == 0 {
                             return Some(Self::Number { number: 0., x: 0, i: 0 })
                         } else if *x == 0 && *x_b == 0 && i % 2 == 0 && i_b % 2 == 0 && *number_b != 0. {
                             return Some(Self::Number { number: number.rem_euclid(*number_b), x: 0, i: 0 })

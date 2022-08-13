@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{operator::Operator, calculation::calc, btree::BTree};
+use crate::{operator::Operator, calculation::calc};
 
 pub fn assign(input: &Vec<Vec<Operator>>, variables: &mut HashMap<String, Vec<Operator>>) {
     let first_part = input.get(0).unwrap();
@@ -55,9 +55,10 @@ fn variable_assignation(input: &Vec<Vec<Operator>>, variables: &mut HashMap<Stri
             }
             match calc(input.get(1).unwrap()) {
                 Ok(value) => {
-                    BTree::from_vec(&mut value.clone()).unwrap_or(BTree::new(Operator::Add)).print();
-                    // println!("{name} = {}", to_printable_string(&value));
-                    variables.insert(String::from(name), value);
+                    // value.print();
+                    // BTree::from_vec(&mut value.clone()).unwrap_or(BTree::new(Operator::Add)).print();
+                    println!("{name} = {}", to_printable_string(&value.to_vec()));
+                    variables.insert(String::from(name), value.to_vec());
                 },
                 Err(e) => println!("{e}")
             }

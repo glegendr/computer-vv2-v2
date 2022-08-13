@@ -1,6 +1,5 @@
 
 use std::{fmt, collections::HashMap};
-use colored::Colorize;
 
 use crate::operator::Operator;
 /* ---------- BTREE ---------- */
@@ -101,6 +100,18 @@ impl BTree {
         format!("{ret} {}", self.node)
     }
 
+    pub fn to_vec(&self) -> Vec<Operator> {
+        let mut ret = Vec::new();
+        if let Some(c1) = &self.c1 {
+            ret.append(&mut c1.to_vec());
+        }
+        if let Some(c2) = &self.c2 {
+            ret.append(&mut c2.to_vec());
+        }
+        ret.push(self.node.clone());
+        ret
+    }
+
     pub fn from_vec(formula: &Vec<Operator>) -> Result<BTree, String> {
         let mut formula_clone = formula.clone();
         let tree = Self::from_vec_recursiv(&mut formula_clone)?;
@@ -147,17 +158,36 @@ impl BTree {
 
 
     pub fn eval(&self) -> Result<BTree, String> {
-        let mut new_tree = self.delete_minus(false);
+        let mut new_tree = self.clone();
         if let Some(c1) = &new_tree.c1 {
             new_tree.c1 = Some(Box::new(c1.eval()?));
         }
         if let Some(c2) = &new_tree.c2 {
             new_tree.c2 = Some(Box::new(c2.eval()?));
         }
+        match (&new_tree.c1, &new_tree.c2) {
+            (Some(c1), Some(c2)) => {
+                if let Some(res) = new_tree.node.calc(&c1.node, &c2.node) {
+                    new_tree.node = res;
+                    new_tree.c1 = None;
+                    new_tree.c2 = None;
+                }
+            },
+            (None, None) => {
+                match &new_tree.node {
+                    Operator::Var(_) | Operator::Number { .. } | Operator::Mat(_) => {},
+                    ope => return Err(format!("No child found for {ope}"))
+                }
+            },
+            _ => return Err(String::from("Only child founded"))
+        }
+        new_tree = new_tree.delete_minus(false);
         if new_tree.has_equivalent_precedence() {
             new_tree = new_tree.calc_equivalent();
         }
-        new_tree.print();
+        if new_tree.calc_mult() {
+            new_tree = new_tree.eval()?;
+        }
         Ok(new_tree)
     }
 
@@ -211,6 +241,11 @@ impl BTree {
                 None => return self.clone(),
             }
         }
+        match (&ret.c1, &ret.c2) {
+            (Some(_), Some(_))  | (None, None)=> {},
+            (Some(c1), None) => ret = *c1.clone(),
+            (None, Some(c2)) => ret = *c2.clone(),
+        }
         ret
     }
 
@@ -228,6 +263,65 @@ impl BTree {
                 ret
             }
         }
+    }
+
+    fn all(&self, f: fn(&Self) -> bool) -> bool {
+        let mut ret = f(self);
+        if let Some(c1) = &self.c1 {
+            ret = ret && c1.all(f);
+        }
+        if let Some(c2) = &self.c2 {
+            ret = ret && c2.all(f);
+        }
+        ret
+    }
+
+    fn calc_mult(&mut self) -> bool {
+        if let Operator::Mult = &self.node {
+            match (&self.c1, &self.c2) {
+                (Some(c1), Some(c2)) => {
+                    if c1.all(|tree| match &tree.node {
+                        Operator::Add | Operator::Number { .. } | Operator::Var(_) | Operator::Mat(_) => true,
+                        _ => false
+                    }) && c2.all(|tree| match &tree.node {
+                        Operator::Add | Operator::Number { .. } | Operator::Var(_) | Operator::Mat(_) => true,
+                        _ => false
+                    }) {
+                        let c1_vals = c1.get_all_vals();
+                        let c2_vals = c2.get_all_vals();
+                        let mut ret = BTree::new(Operator::Add);
+                        for c1_ope in &c1_vals {
+                            for c2_ope in &c2_vals {
+                                match Operator::Mult.calc(c1_ope, c2_ope) {
+                                    Some(res) => {
+                                        match (&ret.c1, &ret.c2) {
+                                            (None, _) => ret.insert_a(BTree::new(res)),
+                                            (_, None) => ret.insert_b(BTree::new(res)),
+                                            _ => {
+                                                let mut new_ret = BTree::new(Operator::Add);
+                                                new_ret.insert_a(ret);
+                                                new_ret.insert_b(BTree::new(res));
+                                                ret = new_ret;
+                                            }
+                                        }
+                                    }
+                                    _ => return false
+                                }
+                            }
+                        }
+                        match (&ret.c1, &ret.c2) {
+                            (Some(c1), None) => *self = *c1.clone(),
+                            (None, Some(c2)) => *self = *c2.clone(),
+                            (None, None) => return false,
+                            _ => *self = ret
+                        }
+                        return true
+                    }
+                },
+                _ => {}
+            }
+        }
+        false
     }
 
     fn has_equivalent_precedence(&self) -> bool {
@@ -251,6 +345,7 @@ impl BTree {
     fn has_equivalent_precedence_rec(&self, precedence: u8) -> bool {
         match &self.node {
             Operator::Var(_) | Operator::Number { .. } | Operator::Mat(_) => true,
+            Operator::Minus | Operator::Div | Operator::Power | Operator::Modulo => false,
             ope => {
                 let mut ret = ope.get_precedence() == precedence;
                 if let Some(c1) = &self.c1 {
