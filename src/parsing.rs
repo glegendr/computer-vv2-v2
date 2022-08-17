@@ -53,12 +53,26 @@ fn shunting_yard(input: &mut Vec<Operator>) -> Result<Vec<Operator>, String> {
     let mut stack = Vec::new();
     input.reverse();
     'a: while let Some(operator) = input.pop() {
-        match operator {
-            Operator::Number {..} | Operator::Mat(_)  | Operator::Var(_) => output.push(operator),
+        match &operator {
+            Operator::Var(name) => {
+                match name.as_str() {
+                    "?" => {
+                        while let Some(stack_ope) = stack.pop() {
+                            match stack_ope {
+                                Operator::OpenParenthesis | Operator::CloseParenthesis => return Err(String::from("Missmatched parentesis")),
+                                _ => output.push(stack_ope)
+                            }
+                        }
+                        output.push(operator);
+                    },
+                    _ => output.push(operator)
+                }
+            }
+            Operator::Number {..} | Operator::Mat(_) => output.push(operator),
             Operator::Equal => {
                 while let Some(stack_ope) = stack.pop() {
                     match stack_ope {
-                        Operator::OpenParenthesis | Operator::CloseParenthesis => return Err(String::from("Missmatched parentesis 02")),
+                        Operator::OpenParenthesis | Operator::CloseParenthesis => return Err(String::from("Missmatched parentesis")),
                         _ => output.push(stack_ope)
                     }
                 }
@@ -69,12 +83,12 @@ fn shunting_yard(input: &mut Vec<Operator>) -> Result<Vec<Operator>, String> {
                 while let Some(stack_ope) = stack.pop() {
                     match stack_ope {
                         Operator::OpenParenthesis => continue 'a,
-                        Operator::CloseParenthesis => return Err(String::from("Missmatched parentesis 00")),
+                        Operator::CloseParenthesis => return Err(String::from("Missmatched parentesis")),
                         _ => output.push(stack_ope),
                     }
                 }
                 if stack.is_empty() {
-                    return Err(String::from("Missmatched parentesis 01"))
+                    return Err(String::from("Missmatched parentesis"))
                 }
             }
             _ => {
@@ -93,7 +107,7 @@ fn shunting_yard(input: &mut Vec<Operator>) -> Result<Vec<Operator>, String> {
 
     while let Some(stack_ope) = stack.pop() {
         match stack_ope {
-            Operator::OpenParenthesis | Operator::CloseParenthesis => return Err(String::from("Missmatched parentesis 02")),
+            Operator::OpenParenthesis | Operator::CloseParenthesis => return Err(String::from("Missmatched parentesis")),
             _ => output.push(stack_ope)
         }
     }

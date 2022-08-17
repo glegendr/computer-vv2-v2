@@ -42,6 +42,7 @@ impl BTree {
 
     }
 
+    #[allow(dead_code)]
     pub fn print(&self) {
         let mut staged_tree = Vec::new();
         let mut depth = 0;
@@ -147,6 +148,38 @@ impl BTree {
             let mut ret = match last_op {
                 Operator::Var(_) | Operator::Number { .. } | Operator::Mat(_) => return Ok(BTree::new(last_op)),
                 Operator::OpenParenthesis | Operator::CloseParenthesis | Operator::Equal => Err("unexpected operator {last_op} in btree")?,
+                Operator::Minus => {
+                    match (formula.pop(), formula.pop()) {
+                        (_, Some(Operator::OpenParenthesis | Operator::CloseParenthesis | Operator::Equal)) | (Some(Operator::OpenParenthesis | Operator::CloseParenthesis | Operator::Equal), _)=> Err("unexpected operator {last_op} in btree")?,
+                        (Some(b@(Operator::Var(_) | Operator::Number { .. } | Operator::Mat(_))), Some(a@(Operator::Var(_) | Operator::Number { .. } | Operator::Mat(_)))) => {
+                            let mut ret = BTree::new(Operator::Minus);
+                            ret.insert_b(BTree::new(b));
+                            ret.insert_a(BTree::new(a));
+                            return Ok(ret)
+                        },
+                        (Some(b@(Operator::Var(_) | Operator::Number { .. } | Operator::Mat(_))), Some(a)) => {
+                            match Operator::Mult.calc(&Operator::Number { number: -1., x: 0, i: 0 }, &b) {
+                                Some(res) => {
+                                    formula.push(res);
+                                    formula.push(a);
+                                    return BTree::from_vec_recursiv(formula)
+                                },
+                                None => Err("Unresolvable equation")?,
+                            }
+                        }
+                        (Some(b@(Operator::Var(_) | Operator::Number { .. } | Operator::Mat(_))), None) => {
+                            match Operator::Mult.calc(&Operator::Number { number: -1., x: 0, i: 0 }, &b) {
+                                Some(res) => {
+                                    formula.push(res);
+                                    return BTree::from_vec_recursiv(formula)
+                                },
+                                None => Err("Unresolvable equation")?,
+                            }
+                        }
+                        _ => {}
+                    }
+                    Err("Error while resolving minus")?
+                }
                 op => BTree::new(op)
             };
             ret.insert_b(BTree::from_vec_recursiv(formula)?);
@@ -193,6 +226,7 @@ impl BTree {
 
     fn calc_equivalent(&self) -> Self {
         let mut ret = BTree::new(self.node.clone());
+        let mut other = Vec::new();
         let vals = self.get_all_vals();
         let mut map: HashMap<(i32, i32), Vec<Operator>> = HashMap::new();
         for ope in vals {
@@ -213,13 +247,14 @@ impl BTree {
                         }
                     }
                 }
+                Operator::Var(_) => other.push(ope),
                 _ => continue
             }
         }
         for ((x, i), v) in map {
             let init = match &self.node {
                 Operator::Add => Operator::Number { number: 0., x, i },
-                Operator::Mult => Operator::Number { number: 1., x: 0, i },
+                Operator::Mult => Operator::Number { number: 1., x: 0, i: 0 },
                 _ => return self.clone()
             };
             match v.iter().fold(Some(init), |acc: Option<Operator>, ope| match acc {
@@ -240,6 +275,19 @@ impl BTree {
                 },
                 None => return self.clone(),
             }
+        }
+        for vars in other {
+            match (&ret.c1, &ret.c2) {
+                (None, _) => ret.insert_a(BTree::new(vars)),
+                (_, None) => ret.insert_b(BTree::new(vars)),
+                _ => {
+                    let mut new_ret = BTree::new(self.node.clone());
+                    new_ret.insert_a(ret);
+                    new_ret.insert_b(BTree::new(vars));
+                    ret = new_ret;
+                }
+            }
+
         }
         match (&ret.c1, &ret.c2) {
             (Some(_), Some(_))  | (None, None)=> {},

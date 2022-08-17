@@ -27,7 +27,10 @@ impl fmt::Display for Operator {
 }
 
 fn i_mult(i: &i32) -> f64 {
-    if i % 4 < 2 {
+    let mod_4 = i % 4;
+    if mod_4 >= -2 && mod_4 < 0 {
+        -1.
+    } else if mod_4 < 2 {
         1.
     }  else {
         -1.
@@ -621,8 +624,10 @@ impl Operator {
                             return Some(Self::Number { number: 1., x: 0, i: 0 })
                         } else if i_b % 2 != 0  || *x_b != 0 {
                             return None
+                        } else if *nb_b < 1. && *nb_b > 0. && (*number < 0. || *x != 0 || *i != 0 || *x_b != 0 || *i_b != 0) {
+                            return None
                         }
-                        Some(Self::Number { number: (number * i_mult(i)).powf(nb_b * i_mult(i_b)), x: x * nb_b.round() as i32 * i_mult(i_b) as i32, i: (i * i_b) % 2 })
+                        Some(Self::Number { number: (number * i_mult(i)).powf(nb_b * i_mult(i_b)) * i_mult(&((i % 2) * *nb_b as i32)), x: x * nb_b.round() as i32 * i_mult(i_b) as i32, i: (i * (*nb_b as i32).abs()) % 2})
                     }
                     (a@Operator::Number { x, i, .. }, Operator::Mat(mat)) => {
                         if *x == 0 && i % 2 == 0 {
@@ -940,6 +945,10 @@ mod mult {
 
     #[test]
     fn mult_nb_mat() {
+        assert_eq!(Operator::Mult.calc(&Operator::Number { number: 1., x: 0, i: 1}, &Operator::Mat(vec![
+            vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
+            vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
+        ])), None);
         assert_eq!(Operator::Mult.calc(&Operator::Number { number: 3., x: 0, i: 2}, &Operator::Mat(vec![
             vec![Operator::Number { number: 1., x: 0, i: 0}, Operator::Number { number: 2., x: 0, i: 0}],
             vec![Operator::Number { number: 3., x: 0, i: 0}, Operator::Number { number: 4., x: 0, i: 0}]
@@ -1040,7 +1049,7 @@ mod sub {
         assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 99, i: 0}, &Operator::Number { number: -4., x: 98, i: 0}), None);
         assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: 99, i: 0}, &Operator::Number { number: 3., x: 98, i: 0}), None);
         assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: -1, i: 0}, &Operator::Number { number: 3., x: -2, i: 0}), None);
-        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: -1, i: 0}, &Operator::Number { number: 3., x: -1, i: 0}), Some(Operator::Number { number: 0., x: -1, i: 0}));
+        assert_eq!(Operator::Minus.calc(&Operator::Number { number: 3., x: -1, i: 0}, &Operator::Number { number: 3., x: -1, i: 0}), Some(Operator::Number { number: 0., x: 0, i: 0}));
     }
 
     #[test]
@@ -1161,6 +1170,15 @@ mod power {
 
     #[test]
     fn power_i() {
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 1., x: 0, i: 1}, &Operator::Number { number: -4., x: 0, i: 0}), Some(Operator::Number { number: 1., x: 0, i: 0}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 1., x: 0, i: 1}, &Operator::Number { number: -3., x: 0, i: 0}), Some(Operator::Number { number: 1., x: 0, i: 1}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 1., x: 0, i: 1}, &Operator::Number { number: -2., x: 0, i: 0}), Some(Operator::Number { number: -1., x: 0, i: 0}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 1., x: 0, i: 1}, &Operator::Number { number: -1., x: 0, i: 0}), Some(Operator::Number { number: -1., x: 0, i: 1}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 1., x: 0, i: 1}, &Operator::Number { number: 0., x: 0, i: 0}), Some(Operator::Number { number: 1., x: 0, i: 0}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 1., x: 0, i: 1}, &Operator::Number { number: 1., x: 0, i: 0}), Some(Operator::Number { number: 1., x: 0, i: 1}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 1., x: 0, i: 1}, &Operator::Number { number: 2., x: 0, i: 0}), Some(Operator::Number { number: -1., x: 0, i: 0}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 1., x: 0, i: 1}, &Operator::Number { number: 3., x: 0, i: 0}), Some(Operator::Number { number: -1., x: 0, i: 1}));
+        assert_eq!(Operator::Power.calc(&Operator::Number { number: 1., x: 0, i: 1}, &Operator::Number { number: 4., x: 0, i: 0}), Some(Operator::Number { number: 1., x: 0, i: 0}));
         assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 0, i: 1}, &Operator::Number { number: 4., x: 0, i: 1}), None);
         assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 0, i: 1}, &Operator::Number { number: 4., x: 0, i: 2}), Some(Operator::Number { number: 0.0123456790123456790123456790123456790123456790123456790123456790, x: 0, i: 0}));
         assert_eq!(Operator::Power.calc(&Operator::Number { number: 3., x: 0, i: 0}, &Operator::Number { number: 2., x: 0, i: 2}), Some(Operator::Number { number: 0.1111111111111111, x: 0, i: 0}));

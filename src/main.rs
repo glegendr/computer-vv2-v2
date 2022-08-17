@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use assignation::change_known_variables;
+use calculation::calc;
 use rustyline::Editor;
 mod assignation;
 mod parsing;
@@ -13,10 +15,10 @@ use crate::parsing::parse_line;
 
 fn main() -> rustyline::Result<()> {
     // `()` can be used when no completer is required
-    let mut variables = HashMap::new();
+    let mut variables: HashMap<String, (Option<String>, Vec<Operator>)> = HashMap::new();
     let mut rl = Editor::<()>::new()?;
     _ = rl.load_history("history.txt");
-    loop {
+    'main_loop: loop {
         let readline = rl.readline("> ");
         match readline {
             Ok(line) => {
@@ -25,9 +27,16 @@ fn main() -> rustyline::Result<()> {
                 }
                 rl.add_history_entry(line.as_str());
                 match line.trim_end() {
+                    "/history" => {
+                        rl.history().iter().for_each(|x| println!("{x}"));
+                        continue
+                    }
                     "/list" => {
-                        for (key, value) in &variables {
-                            println!("{key} = {}", to_printable_string(value));
+                        for (key, (name, value)) in &variables {
+                            match name {
+                                Some(name) => println!("{key}({name}) = {}", to_printable_string(value)),
+                                None => println!("{key} = {}", to_printable_string(value))
+                            }
                         }
                         continue
                     },
@@ -37,7 +46,7 @@ fn main() -> rustyline::Result<()> {
                 match parse_line(line.as_str()) {
                     Err(e) => println!("{e}"),
                     Ok(operators) => {
-                        let splitted: Vec<Vec<Operator>> = operators
+                        let mut splitted: Vec<Vec<Operator>> = operators
                             .split(|ope| ope == &Operator::Equal)
                             .map(|ope| ope.to_vec())
                             .collect();
@@ -69,9 +78,60 @@ fn main() -> rustyline::Result<()> {
                             Ok(0) => assign(&splitted, &mut variables),
                             _ => {
                                 // Calculation
+                                match splitted.last_mut() {
+                                    Some(last) => {
+                                        match last.pop() {
+                                            Some(last) => {
+                                                match last {
+                                                    Operator::Var(name) => match name.as_str() {
+                                                        "?" => {},
+                                                        _ => {
+                                                            println!("Expected ? at the end !");
+                                                            continue;
+                                                        }
+                                                    },
+                                                    _ => continue
+                                                }
+                                            },
+                                            _ => continue
+                                        }
+                                    }
+                                    _ => continue
+                                }
+                                let mut merged = Vec::new();
+                                for part in &splitted {
+                                    if part.is_empty() && merged.is_empty() {
+                                        println!("Empty first part");
+                                        continue 'main_loop
+                                    } else if part.is_empty() {
+                                        continue
+                                    }
+                                    match change_known_variables(part, &variables, None) {
+                                        Ok(mut res) => {
+                                            if merged.is_empty() {
+                                                merged = res;
+                                            } else {
+                                                merged.append(&mut res);
+                                                merged.push(Operator::Minus);
+                                            }
+                                        },
+                                        Err(e) => {
+                                            println!("{e}");
+                                            continue 'main_loop;
+                                        }
+                                    }
+                                }
+                                match calc(&merged) {
+                                    Ok(value) => {
+                                        println!("{}", to_printable_string(&value.to_vec()));
+                                    },
+                                    Err(e) => {
+                                        println!("{e}");
+                                        continue;
+                                    }
+                                }
                             }
                         }
-                        // println!("{splitted:?}");
                     },
                 }
             },
