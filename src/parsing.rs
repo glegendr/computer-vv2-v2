@@ -1,7 +1,93 @@
+use std::{collections::HashMap, slice::Iter};
+
 use crate::operator::Operator;
 
+pub enum ActionType {
+    Calculus(Vec<Operator>),
+    VarAssignation((String, Vec<Operator>)),
+    FunAssignation((String, String, Vec<Operator>))
+}
+
+fn get_function_value(input: &mut Iter<Operator>, variables: &HashMap<String, (Option<String>, Vec<Operator>)>, value: &(Option<String>, Vec<Operator>)) -> Result<Vec<Operator>, String> {
+    if value.0.is_none() {
+        return Ok(value.1.clone())
+    }
+    let mut by = Vec::new();
+
+    while let Some(ope) = input.next() {
+        match ope {
+            Operator::CloseParenthesis => {
+                by.push(Operator::CloseParenthesis);
+                break
+            },
+            Operator::Var(name) => {
+                match name.as_str() {
+                    "i" | "I" => by.push(Operator::Number { number: 1., x: 0, i: 1 }),
+                    _ => {
+                        match variables.get(name) {
+                            Some(value) => by.append(&mut get_function_value(input, variables, value)?),
+                            None => {
+                                if name == &String::from("X") || name == &String::from("x") {
+                                    by.push(Operator::Number { number: 1., x: 1, i: 0 });
+                                } else {
+                                    Err(format!("Unkwown variable {name}"))?
+                                }
+                            }
+                        } 
+                    }
+                }
+            },
+            Operator::Equal => Err("Unautorized variable given to function")?,
+            _ => by.push(ope.clone())
+        }
+    }
+
+    Ok(value.1.iter().fold(Vec::new(), |mut acc, ope| {
+        match ope {
+            Operator::Var(_) => acc.append(&mut by.clone()),
+            _ => acc.push(ope.clone())
+        }
+        acc
+
+    }))
+}
+
+fn change_known_variables(input: &Vec<Operator>, variables: &HashMap<String, (Option<String>, Vec<Operator>)>, v_name: Option<&String>) -> Result<Vec<Operator>, String> {
+    let mut output = Vec::new();
+    let mut iter = input.iter();
+    while let Some(ope) = iter.next() {
+        match ope {
+            Operator::Var(name) => {
+                match name.as_str() {
+                    "i" | "I" => output.push(Operator::Number { number: 1., x: 0, i: 1 }),
+                    _ => {
+                        if let Some(v_name) = v_name {
+                            if v_name == name {
+                                output.push(ope.clone());
+                                continue;
+                            }
+                        }
+                        match variables.get(name) {
+                            Some(value) => output.append(&mut get_function_value(&mut iter, variables, value)?),
+                            None => {
+                                if name == &String::from("X") || name == &String::from("x") {
+                                    output.push(Operator::Number { number: 1., x: 1, i: 0 })
+                                } else {
+                                    Err(format!("Unkwown variable {name}"))?
+                                }
+                            }
+                        } 
+                    }
+                }
+            },
+            _ => output.push(ope.clone()),
+        }
+    }
+    shunting_yard(&mut output)
+}
+
 // TODO 3 * -1
-pub fn parse_line(line: &str) -> Result<Vec<Operator>, String> {
+pub fn parse_line(line: &str, variables: &HashMap<String, (Option<String>, Vec<Operator>)>) -> Result<ActionType, String> {
     let mut saved = String::default();
     let mut operators: Vec<Operator> = Vec::default();
     for c in line.chars() {
@@ -44,11 +130,98 @@ pub fn parse_line(line: &str) -> Result<Vec<Operator>, String> {
             Ok(acc? + ope)
         })?;
 
-    shunting_yard(&mut operators)
+
+    let mut splitted: Vec<Vec<Operator>> = operators
+        .split(|ope| ope == &Operator::Equal)
+        .map(|ope| ope.to_vec())
+        .collect();
+    match splitted.len() {
+        0..=1 => Err("expect 1 equal")?,
+        2 => {}
+        _ => Err("too mutch equal found")?
+    }
+    match splitted.iter().enumerate().fold(Ok(0), |acc, (i, x)| {
+        let mut nb = acc?;
+        nb += x.iter().filter(|ope| ope == &&Operator::Var(String::from("?"))).count();
+        if nb > 1 {
+            return Err(String::from("Multiple ?"))
+        } else if nb != 0 && i == 0 {
+            return Err(String::from("? in first part"))
+        }
+        Ok(nb)
+    })? {
+        0 => { // assign
+            let first_part = splitted.get(0).unwrap();
+        
+            match first_part.len() {
+                0 => Err("Empty input")?,
+                1 => { // Variable assignation
+                    let first_part = splitted.get(0).unwrap();
+                
+                    match first_part.get(0).unwrap() {
+                        Operator::Var(name) => {
+                            if name == "i" || name == "I" {
+                                Err("Cannot reassign i")?
+                            }
+                            Ok(ActionType::VarAssignation((
+                                String::from(name),
+                                change_known_variables(splitted.get(1).unwrap(), &variables, None)?
+                            )))
+                        },
+                        _ => Err("Assignation is only available for variable or function. Eq:\n>> x = 50 - 8")?
+                    }
+
+                }
+                4 => { // Function assignation
+                    match &splitted.get(0).unwrap()[..] {
+                        [Operator::Var(fn_name), Operator::OpenParenthesis, Operator::Var(var_name), Operator::CloseParenthesis] => {
+                            if fn_name == "i" || fn_name == "I" {
+                                Err("Cannot reassign i")?
+                            } else if var_name == "i" || var_name == "I" {
+                                Err("Cannot assign i as a variable")?
+                            }
+                            Ok(ActionType::FunAssignation((
+                                String::from(fn_name),
+                                String::from(var_name),
+                                change_known_variables(splitted.get(1).unwrap(), &variables, Some(var_name))?
+                                )))
+                        }
+                        _ => Err("Assignation is only available for variable or function. Eq:\n>> f(x) = 3 * x + 2")?
+                    }
+                }
+                _ => Err("Assignation is only available for variable or function. Eq:\n>> x = 50 - 8\n>> f(x) = 3 * x + 2")?
+            }
+        },
+        _ => { // Calculation
+            match splitted.get_mut(1).unwrap().pop() {
+                Some(Operator::Var(name)) => match name.as_str() {
+                    "?" => {},
+                    _ => Err("Expected ? at the end of the calculation part")?
+                }
+                _ => Err("Expected ? at the end of the calculation part")?
+            }
+            let mut merged = Vec::new();
+            for part in &splitted {
+                if part.is_empty() && merged.is_empty() {
+                    Err("Empty first part")?
+                } else if part.is_empty() {
+                    continue
+                }
+                let mut res = change_known_variables(part, &variables, None)?;
+                if merged.is_empty() {
+                    merged = res;
+                } else {
+                    merged.append(&mut res);
+                    merged.push(Operator::Minus);
+                }
+            }
+            Ok(ActionType::Calculus(merged))
+        }
+    }
 }
 
 
-fn shunting_yard(input: &mut Vec<Operator>) -> Result<Vec<Operator>, String> {
+pub fn shunting_yard(input: &mut Vec<Operator>) -> Result<Vec<Operator>, String> {
     let mut output = Vec::new();
     let mut stack = Vec::new();
     input.reverse();
