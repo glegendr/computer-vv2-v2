@@ -1,6 +1,6 @@
 use std::{collections::HashMap, slice::Iter};
 
-use crate::operator::Operator;
+use crate::{operator::Operator, assignation::from_postfix};
 
 pub enum ActionType {
     Calculus(Vec<Operator>),
@@ -10,15 +10,24 @@ pub enum ActionType {
 
 fn get_function_value(input: &mut Iter<Operator>, variables: &HashMap<String, (Option<String>, Vec<Operator>)>, value: &(Option<String>, Vec<Operator>)) -> Result<Vec<Operator>, String> {
     if value.0.is_none() {
-        return Ok(value.1.clone())
+        return Ok(from_postfix(&value.1))
     }
     let mut by = Vec::new();
+    let mut depth = 0;
 
     while let Some(ope) = input.next() {
         match ope {
+            Operator::OpenParenthesis => {
+                by.push(Operator::OpenParenthesis);
+                depth += 1
+            },
             Operator::CloseParenthesis => {
                 by.push(Operator::CloseParenthesis);
-                break
+                match depth {
+                    d if d <= 0 => Err("Missmatched Parentesis")?,
+                    1 => break,
+                    _ => depth -= 1,
+                }
             },
             Operator::Var(name) => {
                 match name.as_str() {
@@ -42,7 +51,7 @@ fn get_function_value(input: &mut Iter<Operator>, variables: &HashMap<String, (O
         }
     }
 
-    Ok(value.1.iter().fold(Vec::new(), |mut acc, ope| {
+    Ok(from_postfix(&value.1).iter().fold(Vec::new(), |mut acc, ope| {
         match ope {
             Operator::Var(_) => acc.append(&mut by.clone()),
             _ => acc.push(ope.clone())
@@ -84,6 +93,142 @@ fn change_known_variables(input: &Vec<Operator>, variables: &HashMap<String, (Op
         }
     }
     shunting_yard(&mut output)
+}
+
+fn assign_minus(input: &mut Vec<Operator>) -> Result<(), String> {
+    if input.is_empty() {
+        Err("Empty input")?
+    }
+    let mut depth = 0;
+    let mut natural_depth = 0;
+    let mut ret = Vec::new();
+    let mut end = if input.len() > 3 {
+        3
+    } else {
+        input.len()
+    };
+
+    for index in 0..input.len() {
+        if index > input.len() {
+            continue
+        }
+        match &input[index..end] {
+            [a, b, c] => {
+                match a {
+                    Operator::Minus => {
+                        match index {
+                            0 => {
+                                ret.append(&mut vec![Operator::Number { number: -1., x: 0, i: 0 }, Operator::Mult]);
+                                continue
+                            },
+                            _ => if natural_depth == 0 {
+                                while depth > 0 {
+                                    ret.push(Operator::CloseParenthesis);
+                                    depth -= 1;
+                                }
+                            }
+                        }
+                    }
+                    Operator::Add | Operator::Mult | Operator::MatricialMult | Operator::Modulo | Operator::Div => {
+                        if natural_depth == 0 {
+                            while depth > 0 {
+                                ret.push(Operator::CloseParenthesis);
+                                depth -= 1;
+                            }
+                        }
+                    }
+                    Operator::OpenParenthesis => natural_depth += 1,
+                    Operator::CloseParenthesis => natural_depth -= 1,
+                    _ => {}
+                }
+                match b {
+                    Operator::Minus => {
+                        match (a, c) {
+                            (
+                                Operator::Number { .. } | Operator::CloseParenthesis | Operator::Var(_) | Operator::Mat(_),
+                                Operator::Number { .. } | Operator::OpenParenthesis | Operator::Var(_) | Operator::Mat(_)
+                            ) => ret.push(a.clone()),
+                            (
+                                Operator::Add | Operator::Minus | Operator::Mult | Operator::Div | Operator::Modulo | Operator::MatricialMult | Operator::Power,
+                                Operator::Add | Operator::Minus | Operator::Mult | Operator::Div | Operator::Modulo | Operator::MatricialMult | Operator::Power,
+                            ) => Err("Too mutch operator next to each other")?,
+                            (
+                                Operator::Add | Operator::Minus | Operator::Mult | Operator::Div | Operator::Modulo | Operator::MatricialMult | Operator::Power | Operator::OpenParenthesis,
+                                _,
+                            ) => {
+                                depth += 1;
+                                ret.append(&mut vec![a.clone(), Operator::OpenParenthesis, Operator::Number { number: -1., x: 0, i: 0 }, Operator::Mult]);
+                                input.remove(index + 1);
+                            },
+                            _ => Err("Unexpected token in input")?
+                        }
+                    },
+                    _ => ret.push(a.clone())
+                }
+                
+            }
+            [a, _] | [a] => match a {
+                Operator::Minus => {
+                    match index {
+                        0 => {
+                            ret.append(&mut vec![Operator::Number { number: -1., x: 0, i: 0 }, Operator::Mult]);
+                            continue
+                        },
+                        _ => if natural_depth == 0 {
+                            while depth > 0 {
+                                ret.push(Operator::CloseParenthesis);
+                                depth -= 1;
+                            }
+                            ret.push(a.clone())
+                        }
+                    }
+                }
+                Operator::Add | Operator::Mult | Operator::MatricialMult | Operator::Modulo | Operator::Div => {
+                    if natural_depth == 0 {
+                        while depth > 0 {
+                            ret.push(Operator::CloseParenthesis);
+                            depth -= 1;
+                        }
+                    }
+                    ret.push(a.clone())
+                }
+                Operator::Equal => {
+                    while depth > 0 {
+                        ret.push(Operator::CloseParenthesis);
+                        depth -= 1;
+                    }
+                    ret.push(a.clone());
+                }
+                Operator::Var(name) => match name.as_str() {
+                    "?" => {
+                        while depth > 0 {
+                            ret.push(Operator::CloseParenthesis);
+                            depth -= 1;
+                        }
+                        ret.push(a.clone());
+                    }
+                    _ => ret.push(a.clone())
+                }
+                _ => ret.push(a.clone())
+            },
+            _ => {}
+        }
+
+        if end > input.len() {
+            end = input.len()
+        }
+        if end < input.len() {
+            end += 1;
+        }
+    }
+
+    while depth > 0 {
+        ret.push(Operator::CloseParenthesis);
+        depth -= 1;
+    }
+    
+    *input = ret;
+    Ok(())
 }
 
 // TODO 3 * -1
@@ -130,6 +275,7 @@ pub fn parse_line(line: &str, variables: &HashMap<String, (Option<String>, Vec<O
             Ok(acc? + ope)
         })?;
 
+    assign_minus(&mut operators)?;
 
     let mut splitted: Vec<Vec<Operator>> = operators
         .split(|ope| ope == &Operator::Equal)
@@ -139,6 +285,9 @@ pub fn parse_line(line: &str, variables: &HashMap<String, (Option<String>, Vec<O
         0..=1 => Err("expect 1 equal")?,
         2 => {}
         _ => Err("too mutch equal found")?
+    }
+    if splitted.get(1).unwrap().is_empty() {
+        Err("Empty assignation")?
     }
     match splitted.iter().enumerate().fold(Ok(0), |acc, (i, x)| {
         let mut nb = acc?;
@@ -286,6 +435,55 @@ pub fn shunting_yard(input: &mut Vec<Operator>) -> Result<Vec<Operator>, String>
     }
 
     Ok(output)
+}
+
+#[cfg(test)]
+mod minus {
+    use super::*;
+
+    #[test]
+    fn all() {
+        let mut x;
+        // 1 => 1
+        x = vec![Operator::Number { number: 1., x: 0, i: 0 }];
+        _ = assign_minus(&mut x);
+        assert_eq!(x, vec![Operator::Number { number: 1., x: 0, i: 0 }]);
+
+        // -1 => -1 * 1
+        x = vec![Operator::Minus, Operator::Number { number: 1., x: 0, i: 0 }];
+        _ = assign_minus(&mut x);
+        assert_eq!(x, vec![Operator::Number { number: -1., x: 0, i: 0 }, Operator::Mult, Operator::Number { number: 1., x: 0, i: 0 }]);
+
+        // 1-2 => 1-2
+        x = vec![Operator::Number { number: 1., x: 0, i: 0 }, Operator::Minus, Operator::Number { number: 2., x: 0, i: 0 }];
+        _ = assign_minus(&mut x);
+        assert_eq!(x, vec![Operator::Number { number: 1., x: 0, i: 0 }, Operator::Minus, Operator::Number { number: 2., x: 0, i: 0 }]);
+
+        // 1 + - 2 => 1 + (-1 * 2)
+        x = vec![Operator::Number { number: 1., x: 0, i: 0 }, Operator::Add, Operator::Minus, Operator::Number { number: 2., x: 0, i: 0 }];
+        _ = assign_minus(&mut x);
+        assert_eq!(x, vec![Operator::Number { number: 1., x: 0, i: 0 }, Operator::Add, Operator::OpenParenthesis, Operator::Number { number: -1., x: 0, i: 0 }, Operator::Mult, Operator::Number { number: 2., x: 0, i: 0 }, Operator::CloseParenthesis]);
+
+        // 1 + - 2 - 3 => 1 + (-1 * 2) - 3
+        x = vec![Operator::Number { number: 1., x: 0, i: 0 }, Operator::Add, Operator::Minus, Operator::Number { number: 2., x: 0, i: 0 }, Operator::Minus, Operator::Number { number: 3., x: 0, i: 0 }];
+        _ = assign_minus(&mut x);
+        assert_eq!(x, vec![Operator::Number { number: 1., x: 0, i: 0 }, Operator::Add, Operator::OpenParenthesis, Operator::Number { number: -1., x: 0, i: 0 }, Operator::Mult, Operator::Number { number: 2., x: 0, i: 0 }, Operator::CloseParenthesis, Operator::Minus, Operator::Number { number: 3., x: 0, i: 0 }]);
+
+        // 1 / - 2 =>  / (-1 * 2)
+        x = vec![Operator::Number { number: 1., x: 0, i: 0 }, Operator::Div, Operator::Minus, Operator::Number { number: 2., x: 0, i: 0 }];
+        _ = assign_minus(&mut x);
+        assert_eq!(x, vec![Operator::Number { number: 1., x: 0, i: 0 }, Operator::Div, Operator::OpenParenthesis, Operator::Number { number: -1., x: 0, i: 0 }, Operator::Mult, Operator::Number { number: 2., x: 0, i: 0 }, Operator::CloseParenthesis]);
+
+        // 1 ^ - 2 + 3 => 1 ^ (-1 * 2) + 3
+        x = vec![Operator::Number { number: 1., x: 0, i: 0 }, Operator::Power, Operator::Minus, Operator::Number { number: 2., x: 0, i: 0 }, Operator::Add, Operator::Number { number: 3., x: 0, i: 0 }];
+        _ = assign_minus(&mut x);
+        assert_eq!(x, vec![Operator::Number { number: 1., x: 0, i: 0 }, Operator::Power, Operator::OpenParenthesis, Operator::Number { number: -1., x: 0, i: 0 }, Operator::Mult, Operator::Number { number: 2., x: 0, i: 0 }, Operator::CloseParenthesis, Operator::Add, Operator::Number { number: 3., x: 0, i: 0 }]);
+
+        // (1 + 2) - (3 - 4) => (1 + 2) - (3 - 4)
+        x = vec![Operator::OpenParenthesis, Operator::Number { number: 1., x: 0, i: 0 }, Operator::Add, Operator::Number { number: 2., x: 0, i: 0 }, Operator::CloseParenthesis, Operator::Minus, Operator::OpenParenthesis, Operator::Number { number: 3., x: 0, i: 0 }, Operator::Add, Operator::Number { number: 4., x: 0, i: 0 }, Operator::CloseParenthesis];
+        _ = assign_minus(&mut x);
+        assert_eq!(x, vec![Operator::OpenParenthesis, Operator::Number { number: 1., x: 0, i: 0 }, Operator::Add, Operator::Number { number: 2., x: 0, i: 0 }, Operator::CloseParenthesis, Operator::Minus, Operator::OpenParenthesis, Operator::Number { number: 3., x: 0, i: 0 }, Operator::Add, Operator::Number { number: 4., x: 0, i: 0 }, Operator::CloseParenthesis]);
+    }
 }
 
 #[cfg(test)]

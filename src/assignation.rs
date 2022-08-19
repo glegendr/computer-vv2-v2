@@ -1,6 +1,6 @@
 // use std::{collections::HashMap, slice::Iter};
 
-use crate::{operator::Operator, calculation::calc};
+use crate::{operator::Operator};
 
 // pub fn assign(input: &Vec<Vec<Operator>>, variables: &mut HashMap<String, (Option<String>, Vec<Operator>)>) {
 //     let first_part = input.get(0).unwrap();
@@ -81,7 +81,7 @@ pub fn to_printable_string(value: &Vec<Operator>) -> String {
     ret
 }
 
-fn from_postfix(value: &Vec<Operator>) -> Vec<Operator> {
+pub fn from_postfix(value: &Vec<Operator>) -> Vec<Operator> {
     let mut stack: Vec<Vec<Operator>> = Vec::new();
     for ope in value {
         match ope {

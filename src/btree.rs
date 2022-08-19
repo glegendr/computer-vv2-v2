@@ -148,38 +148,39 @@ impl BTree {
             let mut ret = match last_op {
                 Operator::Var(_) | Operator::Number { .. } | Operator::Mat(_) => return Ok(BTree::new(last_op)),
                 Operator::OpenParenthesis | Operator::CloseParenthesis | Operator::Equal => Err("unexpected operator {last_op} in btree")?,
-                Operator::Minus => {
-                    match (formula.pop(), formula.pop()) {
-                        (_, Some(Operator::OpenParenthesis | Operator::CloseParenthesis | Operator::Equal)) | (Some(Operator::OpenParenthesis | Operator::CloseParenthesis | Operator::Equal), _)=> Err("unexpected operator {last_op} in btree")?,
-                        (Some(b@(Operator::Var(_) | Operator::Number { .. } | Operator::Mat(_))), Some(a@(Operator::Var(_) | Operator::Number { .. } | Operator::Mat(_)))) => {
-                            let mut ret = BTree::new(Operator::Minus);
-                            ret.insert_b(BTree::new(b));
-                            ret.insert_a(BTree::new(a));
-                            return Ok(ret)
-                        },
-                        (Some(b@(Operator::Var(_) | Operator::Number { .. } | Operator::Mat(_))), Some(a)) => {
-                            match Operator::Mult.calc(&Operator::Number { number: -1., x: 0, i: 0 }, &b) {
-                                Some(res) => {
-                                    formula.push(res);
-                                    formula.push(a);
-                                    return BTree::from_vec_recursiv(formula)
-                                },
-                                None => Err("Unresolvable equation")?,
-                            }
-                        }
-                        (Some(b@(Operator::Var(_) | Operator::Number { .. } | Operator::Mat(_))), None) => {
-                            match Operator::Mult.calc(&Operator::Number { number: -1., x: 0, i: 0 }, &b) {
-                                Some(res) => {
-                                    formula.push(res);
-                                    return BTree::from_vec_recursiv(formula)
-                                },
-                                None => Err("Unresolvable equation")?,
-                            }
-                        }
-                        _ => {}
-                    }
-                    Err("Error while resolving minus")?
-                }
+                // Operator::Minus => {
+                //     println!("{formula:?}");
+                //     match (formula.pop(), formula.pop()) {
+                //         (_, Some(Operator::OpenParenthesis | Operator::CloseParenthesis | Operator::Equal)) | (Some(Operator::OpenParenthesis | Operator::CloseParenthesis | Operator::Equal), _)=> Err("unexpected operator {last_op} in btree")?,
+                //         (Some(b@(Operator::Var(_) | Operator::Number { .. } | Operator::Mat(_))), Some(a@(Operator::Var(_) | Operator::Number { .. } | Operator::Mat(_)))) => {
+                //             let mut ret = BTree::new(Operator::Minus);
+                //             ret.insert_b(BTree::new(b));
+                //             ret.insert_a(BTree::new(a));
+                //             return Ok(ret)
+                //         },
+                //         (Some(b@(Operator::Var(_) | Operator::Number { .. } | Operator::Mat(_))), Some(a)) => {
+                //             match Operator::Mult.calc(&Operator::Number { number: -1., x: 0, i: 0 }, &b) {
+                //                 Some(res) => {
+                //                     formula.push(res);
+                //                     formula.push(a);
+                //                     return BTree::from_vec_recursiv(formula)
+                //                 },
+                //                 None => Err("Unresolvable equation")?,
+                //             }
+                //         }
+                //         (Some(b@(Operator::Var(_) | Operator::Number { .. } | Operator::Mat(_))), None) => {
+                //             match Operator::Mult.calc(&Operator::Number { number: -1., x: 0, i: 0 }, &b) {
+                //                 Some(res) => {
+                //                     formula.push(res);
+                //                     return BTree::from_vec_recursiv(formula)
+                //                 },
+                //                 None => Err("Unresolvable equation")?,
+                //             }
+                //         }
+                //         _ => {}
+                //     }
+                //     Err("Error while resolving minus")?
+                // }
                 op => BTree::new(op)
             };
             ret.insert_b(BTree::from_vec_recursiv(formula)?);

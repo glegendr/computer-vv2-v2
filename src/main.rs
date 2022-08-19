@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use calculation::calc;
+use commands::command_handler;
 use parsing::ActionType;
 use rustyline::Editor;
 mod assignation;
@@ -8,6 +9,7 @@ mod parsing;
 mod operator;
 mod calculation;
 mod btree;
+mod commands;
 
 use crate::operator::Operator;
 use crate::assignation::{to_printable_string};
@@ -26,27 +28,13 @@ fn main() -> rustyline::Result<()> {
                     continue
                 }
                 rl.add_history_entry(line.as_str());
-                match line.trim_end() {
-                    "/history" => {
-                        rl.history().iter().for_each(|x| println!("{x}"));
-                        continue
-                    }
-                    "/list" => {
-                        for (key, (name, value)) in &variables {
-                            match name {
-                                Some(name) => println!("{key}({name}) = {}", to_printable_string(value)),
-                                None => println!("{key} = {}", to_printable_string(value))
-                            }
-                        }
-                        continue
-                    },
-                    _ => {}
+                if let Some('/') = line.chars().nth(0) {
+                    command_handler(&line, &mut variables, &mut rl);
+                    continue
                 }
-
                 match parse_line(line.as_str(), &variables) {
                     Err(e) => println!("{e}"),
                     Ok(ActionType::Calculus(input)) => {
-                        println!("{input:?}");
                         match calc(&input) {
                             Ok(value) => {
                                 println!("{}", to_printable_string(&value.to_vec()));
@@ -58,7 +46,6 @@ fn main() -> rustyline::Result<()> {
                         }
                     }
                     Ok(ActionType::VarAssignation((var_name, input))) => {
-                        println!("{input:?}");
                         match calc(&input) {
                             Ok(value) => {
                                 println!("{var_name} = {}", to_printable_string(&value.to_vec()));
@@ -71,7 +58,6 @@ fn main() -> rustyline::Result<()> {
                         }
                     },
                     Ok(ActionType::FunAssignation((fn_name, var_name, input))) => {
-                        println!("{input:?}");
                         match calc(&input) {
                             Ok(value) => {
                                 println!("{fn_name}({var_name}) = {}", to_printable_string(&value.to_vec()));
