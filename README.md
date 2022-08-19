@@ -1,5 +1,5 @@
 # computor-v2-v2
-
+computorv2 42 project
 ## Run
 You need rust and Cargo, then launch:    
 `cargo run --release`
