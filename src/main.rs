@@ -28,7 +28,7 @@ fn main() -> rustyline::Result<()> {
                     continue
                 }
                 rl.add_history_entry(line.as_str());
-                if let Some('/') = line.chars().nth(0) {
+                if line.starts_with("/") {
                     command_handler(&line, &mut variables, &mut rl);
                     continue
                 }
