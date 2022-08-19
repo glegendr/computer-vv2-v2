@@ -13,7 +13,53 @@ pub fn command_handler(line: &str, variables: &mut HashMap<String, (Option<Strin
         "/list" => list(splitted[1..].to_vec(), variables),
         "/clear" => clear(splitted[1..].to_vec(), variables, rl),
         "/chart" => chart(splitted[1..].to_vec(), chart_enabled),
-        cmd => println!("unknown command {cmd}")
+        "/help" => help(splitted[1..].to_vec()),
+        cmd => println!("unknown command {cmd} try /help")
+    }
+}
+
+fn help(splitted: Vec<String>) {
+    match splitted.is_empty() {
+        true => help(vec![String::from("*")]),
+        false => {
+            for cmd in splitted {
+                match cmd.to_lowercase().as_str() {
+                    "*" | "all" => help(vec![String::from("cmd"), String::from("ass"), String::from("calc")]),
+                    "cmd" | "commands" => {
+                        println!("{}", "----------- Commands ------------".bold().purple());
+                        println!("{} {} ..", "/history".purple(), "<?pattern>".yellow());
+                        println!("display all history or filtered if patern is given\n");
+                        println!("{} {} ..", "/list".purple(), "<?ima> <?fn> <?rat> <?mat>".yellow());
+                        println!("list all variables sorted by type or selected one\n");
+                        println!("{} {} ..", "/clear".purple(), "<?history> <?variables> <?*>".yellow());
+                        println!("clear history and variables or only selected one\n");
+                        println!("{} {} {} ..", "/chart".purple(), "<?on>".green(), "<?off>".red());
+                        println!("toggle chart\n");
+                        println!("{} {} ..", "/help".purple(),  "<?cmd> <?ass> <?calc> <?*>".yellow());
+                        println!("display helping message about commands, assignation and calculus\n");
+                    }
+                    "ass" | "assignation" | "=" => {
+                        println!("{}", "---------- Assignation ----------".bold().purple());
+                        println!("Assign a variable or a function to use it in calculus after.");
+                        println!("Rationnal:");
+                        println!("{} = 32 + 10\n", "myRatVar".purple());
+                        println!("Imaginary:");
+                        println!("{} = (32 + 10) * i\n", "myImaVar".purple());
+                        println!("Matrix:");
+                        println!("{} = [[1,2,3];[4,5,6];[7,8,9]] * 2\n", "myMatrix".purple());
+                        println!("Function:");
+                        println!("{}({1}) = (32 + {1}) * 10\n", "myFn".purple(), "myFnVar".yellow());
+                    }
+                    "calc" | "calculus" | "?" => {
+                        println!("{}", "----------- Calculus ------------".bold().purple());
+                        println!("To do a calculus simply use:");
+                        println!("-2 + 32 + 3*4 = ?\n");
+                        println!("This will give you {}", "42".yellow());
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
 }
 
