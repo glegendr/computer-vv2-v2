@@ -1,4 +1,4 @@
-# computer-v2-v2
+# computor-v2-v2
 
 ## Run
 You need rust and Cargo, then launch:    
