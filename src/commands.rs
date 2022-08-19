@@ -3,7 +3,7 @@ use colored::Colorize;
 use rustyline::Editor;
 use crate::{operator::Operator, assignation::to_printable_string};
 
-pub fn command_handler(line: &str, variables: &mut HashMap<String, (Option<String>, Vec<Operator>)>, rl: &mut Editor<()>) {
+pub fn command_handler(line: &str, variables: &mut HashMap<String, (Option<String>, Vec<Operator>)>, rl: &mut Editor<()>, chart_enabled: &mut bool) {
     let splitted: Vec<String> = line.split(" ").map(|cmd| String::from(cmd.trim())).collect();
     if splitted.is_empty() {
         return
@@ -12,7 +12,27 @@ pub fn command_handler(line: &str, variables: &mut HashMap<String, (Option<Strin
         "/history" => history(splitted[1..].to_vec(), rl),
         "/list" => list(splitted[1..].to_vec(), variables),
         "/clear" => clear(splitted[1..].to_vec(), variables, rl),
+        "/chart" => chart(splitted[1..].to_vec(), chart_enabled),
         cmd => println!("unknown command {cmd}")
+    }
+}
+
+fn chart(splitted: Vec<String>, chart_enabled: &mut bool) {
+    match splitted.is_empty() {
+        true => *chart_enabled = !*chart_enabled,
+        false => {
+            for cmd in splitted {
+                match cmd.to_lowercase().as_str() {
+                    "on" | "true" => *chart_enabled = true,
+                    "off" | "false" => *chart_enabled = false,
+                    _ => {}
+                }
+            }
+        }
+    }
+    match *chart_enabled {
+        true => println!("{}", "+ chart".green()),
+        false => println!("{}", "- chart".red())
     }
 }
 

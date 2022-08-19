@@ -3,7 +3,7 @@ use std::{collections::HashMap, slice::Iter};
 use crate::{operator::Operator, assignation::from_postfix};
 
 pub enum ActionType {
-    Calculus(Vec<Operator>),
+    Calculus((Vec<Operator>, Vec<Operator>)),
     VarAssignation((String, Vec<Operator>)),
     FunAssignation((String, String, Vec<Operator>))
 }
@@ -102,16 +102,16 @@ fn assign_minus(input: &mut Vec<Operator>) -> Result<(), String> {
     let mut depth = 0;
     let mut natural_depth = 0;
     let mut ret = Vec::new();
-    let mut end = if input.len() > 3 {
-        3
-    } else {
-        input.len()
-    };
 
     for index in 0..input.len() {
         if index > input.len() {
             continue
         }
+        let end = if index + 3 > input.len() {
+            input.len()
+        } else {
+            index + 3
+        };
         match &input[index..end] {
             [a, b, c] => {
                 match a {
@@ -142,6 +142,13 @@ fn assign_minus(input: &mut Vec<Operator>) -> Result<(), String> {
                     _ => {}
                 }
                 match b {
+                    Operator::Equal => {
+                        ret.push(a.clone());
+                        while depth > 0 {
+                            ret.push(Operator::CloseParenthesis);
+                            depth -= 1;
+                        }
+                    }
                     Operator::Minus => {
                         match (a, c) {
                             (
@@ -167,7 +174,8 @@ fn assign_minus(input: &mut Vec<Operator>) -> Result<(), String> {
                 }
                 
             }
-            [a, _] | [a] => match a {
+            [a, _] | [a] => {
+                match a {
                 Operator::Minus => {
                     match index {
                         0 => {
@@ -210,15 +218,9 @@ fn assign_minus(input: &mut Vec<Operator>) -> Result<(), String> {
                     _ => ret.push(a.clone())
                 }
                 _ => ret.push(a.clone())
-            },
+            }
+        },
             _ => {}
-        }
-
-        if end > input.len() {
-            end = input.len()
-        }
-        if end < input.len() {
-            end += 1;
         }
     }
 
@@ -349,22 +351,20 @@ pub fn parse_line(line: &str, variables: &HashMap<String, (Option<String>, Vec<O
                 }
                 _ => Err("Expected ? at the end of the calculation part")?
             }
-            let mut merged = Vec::new();
-            for part in &splitted {
-                if part.is_empty() && merged.is_empty() {
-                    Err("Empty first part")?
-                } else if part.is_empty() {
-                    continue
-                }
-                let mut res = change_known_variables(part, &variables, None)?;
-                if merged.is_empty() {
-                    merged = res;
-                } else {
-                    merged.append(&mut res);
-                    merged.push(Operator::Minus);
-                }
+            let ret = splitted
+                .iter()
+                .enumerate()
+                .map(|(i, part)| {
+                    match part.is_empty() && i == 0 {
+                        true => Err(String::from("Empty first part")),
+                        false => Ok(change_known_variables(part, &variables, None)?)
+                    }
+                })
+                .collect::<Result<Vec<Vec<Operator>>, String>>()?;
+            match (ret.get(0),ret.get(1)) {
+                (Some(fst), Some(snd)) => return Ok(ActionType::Calculus((fst.clone(), snd.clone()))),
+                _ => Err("Error while parsing calculus")?
             }
-            Ok(ActionType::Calculus(merged))
         }
     }
 }
@@ -444,6 +444,17 @@ mod minus {
     #[test]
     fn all() {
         let mut x;
+
+        // 2^-3 = 0 ? => 2^(-1 * 3) = 0 ?
+        x = vec![ Operator::Number { number: 2., x: 0, i: 0 }, Operator::Power, Operator::Minus, Operator::Number { number: 3., x: 0, i: 0 }, Operator::Equal, Operator::Number { number: 0., x: 0, i: 0 }, Operator::Var(String::from("?"))];
+        _ = assign_minus(&mut x);
+        assert_eq!(x, vec![ Operator::Number { number: 2., x: 0, i: 0 }, Operator::Power, Operator::OpenParenthesis, Operator::Number { number: -1., x: 0, i: 0 }, Operator::Mult, Operator::Number { number: 3., x: 0, i: 0 }, Operator::CloseParenthesis, Operator::Equal, Operator::Number { number: 0., x: 0, i: 0 }, Operator::Var(String::from("?"))]);
+
+        // -2^-3 =? => -1 * 2 ^ (-1 * 3) =?
+        x = vec![Operator::Minus, Operator::Number { number: 2., x: 0, i: 0 }, Operator::Power, Operator::Minus, Operator::Number { number: 3., x: 0, i: 0 }, Operator::Equal, Operator::Var(String::from("?"))];
+        _ = assign_minus(&mut x);
+        assert_eq!(x, vec![Operator::Number { number: -1., x: 0, i: 0 }, Operator::Mult, Operator::Number { number: 2., x: 0, i: 0 }, Operator::Power, Operator::OpenParenthesis, Operator::Number { number: -1., x: 0, i: 0 }, Operator::Mult, Operator::Number { number: 3., x: 0, i: 0 }, Operator::CloseParenthesis, Operator::Equal, Operator::Var(String::from("?"))]);
+
         // 1 => 1
         x = vec![Operator::Number { number: 1., x: 0, i: 0 }];
         _ = assign_minus(&mut x);
