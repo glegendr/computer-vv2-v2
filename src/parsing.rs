@@ -233,12 +233,62 @@ fn assign_minus(input: &mut Vec<Operator>) -> Result<(), String> {
     Ok(())
 }
 
-// TODO 3 * -1
+fn intersect_with_mult(input: &mut Vec<Operator>) -> Result<(), String> {
+    if input.is_empty() {
+        Err("Empty input")?
+    }
+    let mut ret = Vec::new();
+    for index in 0..input.len() {
+        if index > input.len() {
+            continue
+        }
+        let end = if index + 2 > input.len() {
+            input.len()
+        } else {
+            index + 2
+        };
+        match &input[index..end] {
+            [a, b] => {
+                match (a, b) {
+                    (
+                        Operator::Number { .. } | Operator::Var(_) | Operator::Mat(_) | Operator::CloseParenthesis,
+                        Operator::Number { .. } | Operator::Var(_) | Operator::Mat(_) | Operator::OpenParenthesis
+                    ) => {
+                        if let Operator::Var(name) = a {
+                            if name == "?" {
+                                ret.push(a.clone());
+                                continue
+                            }
+                        } else if let Operator::Var(name) = b {
+                            if name == "?" {
+                                ret.push(a.clone());
+                                continue
+                            }
+                        }
+                        ret.push(a.clone());
+                        ret.push(Operator::Mult);
+                    }
+                    _ => ret.push(a.clone()),
+                }
+            }
+            [a] => ret.push(a.clone()),
+            _ => {}
+        }
+    }
+    *input = ret;
+    Ok(())
+}
+
+
 pub fn parse_line(line: &str, variables: &HashMap<String, (Option<String>, Vec<Operator>)>) -> Result<ActionType, String> {
     let mut saved = String::default();
     let mut operators: Vec<Operator> = Vec::default();
     for c in line.chars() {
-        if !"+-()%^*=?/".contains(c) || String::from(c).parse::<u8>().is_ok() {
+        if (c.is_numeric() || c == '.') && saved.chars().all(|c| c.is_numeric() || c == '.') {
+            saved.push(c);
+        } else if !"+-()%^*=?/".contains(c) && c.is_alphabetic() && saved.chars().all(|c| !"+-()%^*=?/".contains(c) && c.is_alphabetic()) {
+            saved.push(c);
+        } else if c == ' ' {
             saved.push(c);
         } else {
             if saved.is_empty() && c == '*' {
@@ -278,6 +328,7 @@ pub fn parse_line(line: &str, variables: &HashMap<String, (Option<String>, Vec<O
         })?;
 
     assign_minus(&mut operators)?;
+    intersect_with_mult(&mut operators)?;
 
     let mut splitted: Vec<Vec<Operator>> = operators
         .split(|ope| ope == &Operator::Equal)
