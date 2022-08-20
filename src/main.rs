@@ -11,6 +11,7 @@ mod calculation;
 mod btree;
 mod commands;
 
+use crate::btree::BTree;
 use crate::operator::Operator;
 use crate::assignation::{to_printable_string};
 use crate::parsing::parse_line;  
@@ -20,6 +21,7 @@ fn main() -> rustyline::Result<()> {
     // `()` can be used when no completer is required
     let mut variables: HashMap<String, (Option<String>, Vec<Operator>)> = HashMap::new();
     let mut chart = false;
+    let mut tree = false;
     let mut rl = Editor::<()>::new()?;
     _ = rl.load_history("history.txt");
     loop {
@@ -31,7 +33,7 @@ fn main() -> rustyline::Result<()> {
                 }
                 rl.add_history_entry(line.as_str());
                 if line.starts_with("/") {
-                    command_handler(&line, &mut variables, &mut rl, &mut chart);
+                    command_handler(&line, &mut variables, &mut rl, &mut chart, &mut tree);
                     continue
                 }
                 match parse_line(line.as_str(), &variables) {
@@ -44,6 +46,11 @@ fn main() -> rustyline::Result<()> {
                                         true => println!("true"),
                                         false => {
                                             println!("{}", to_printable_string(&value.to_vec()));
+                                            if tree {
+                                                if let Ok(tree) = BTree::from_vec(&first_part) {
+                                                    tree.print();
+                                                }
+                                            }
                                             if chart {
                                                 print_chart(&first_part);
                                             }
@@ -69,6 +76,11 @@ fn main() -> rustyline::Result<()> {
                                                     true => println!("true"),
                                                     false => {
                                                         println!("{}", to_printable_string(&value.to_vec()));
+                                                        if tree {
+                                                            if let Ok(tree) = BTree::from_vec(&first_part) {
+                                                                tree.print();
+                                                            }
+                                                        }
                                                         if chart {
                                                             print_chart(&first_part);
                                                         }

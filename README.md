@@ -12,6 +12,7 @@ You need rust and Cargo, then launch:
 |/list|`<?ima> <?fn> <?rat> <?mat>`|list all variables sorted by type or selected one|
 |/clear|`<?history> <?variables> <?*>`|clear history and variables or only selected one|
 |/chart|`<?on> <?off>`|toggle chart|
+|/tree|`<?on> <?off>`|toggle tree|
 |/help|`<?cmd> <?ass> <?calc> <?*>`|display helping message about commands, assignation and calculus|
 
 ## Assignation

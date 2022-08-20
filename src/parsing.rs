@@ -284,9 +284,9 @@ pub fn parse_line(line: &str, variables: &HashMap<String, (Option<String>, Vec<O
     let mut saved = String::default();
     let mut operators: Vec<Operator> = Vec::default();
     for c in line.chars() {
-        if (c.is_numeric() || c == '.') && saved.chars().all(|c| c.is_numeric() || c == '.') {
+        if (c.is_numeric() || ".[];,".contains(c)) && saved.chars().all(|c| c.is_numeric() || ".[];, ".contains(c)) {
             saved.push(c);
-        } else if !"+-()%^*=?/".contains(c) && c.is_alphabetic() && saved.chars().all(|c| !"+-()%^*=?/".contains(c) && c.is_alphabetic()) {
+        } else if !"+-()%^*=?/".contains(c) && c.is_alphabetic() && saved.chars().all(|c| !"+-()%^*=?/".contains(c) && c.is_alphabetic() || c == ' ') {
             saved.push(c);
         } else if c == ' ' {
             saved.push(c);
