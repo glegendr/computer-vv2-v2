@@ -69,7 +69,7 @@ fn main() -> rustyline::Result<()> {
                                     true => println!("true"),
                                     false => {
                                         first_part.append(&mut sec_part);
-                                        first_part.push(Operator::Minus);
+                                        first_part.append(&mut vec![Operator::Number { number: -1., x: 0, i: 0 }, Operator::Mult, Operator::Add]);
                                         match calc(&first_part) {
                                             Ok(value) => {
                                                 match value.to_vec() == vec![Operator::Number { number: 0., x: 0, i: 0 }] {
