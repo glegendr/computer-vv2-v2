@@ -77,7 +77,11 @@ fn change_known_variables(input: &Vec<Operator>, variables: &HashMap<String, (Op
                             }
                         }
                         match variables.get(name) {
-                            Some(value) => output.append(&mut get_function_value(&mut iter, variables, value)?),
+                            Some(value) => {
+                                output.push(Operator::OpenParenthesis);
+                                output.append(&mut get_function_value(&mut iter, variables, value)?);
+                                output.push(Operator::CloseParenthesis);
+                            },
                             None => {
                                 if name == &String::from("X") || name == &String::from("x") {
                                     output.push(Operator::Number { number: 1., x: 1, i: 0 })
@@ -233,7 +237,7 @@ fn assign_minus(input: &mut Vec<Operator>) -> Result<(), String> {
     Ok(())
 }
 
-fn intersect_with_mult(input: &mut Vec<Operator>) -> Result<(), String> {
+fn intersect_with_mult(input: &mut Vec<Operator>, variables: &HashMap<String, (Option<String>, Vec<Operator>)>) -> Result<(), String> {
     if input.is_empty() {
         Err("Empty input")?
     }
@@ -258,6 +262,12 @@ fn intersect_with_mult(input: &mut Vec<Operator>) -> Result<(), String> {
                             if name == "?" {
                                 ret.push(a.clone());
                                 continue
+                            }
+                            if let Some((is_fn, _)) = variables.get(name) {
+                                if is_fn.is_some() {
+                                    ret.push(a.clone());
+                                    continue;
+                                }
                             }
                         } else if let Operator::Var(name) = b {
                             if name == "?" {
@@ -328,7 +338,7 @@ pub fn parse_line(line: &str, variables: &HashMap<String, (Option<String>, Vec<O
         })?;
 
     assign_minus(&mut operators)?;
-    intersect_with_mult(&mut operators)?;
+    // intersect_with_mult(&mut operators)?;
 
     let mut splitted: Vec<Vec<Operator>> = operators
         .split(|ope| ope == &Operator::Equal)
@@ -358,8 +368,10 @@ pub fn parse_line(line: &str, variables: &HashMap<String, (Option<String>, Vec<O
             match first_part.len() {
                 0 => Err("Empty input")?,
                 1 => { // Variable assignation
+                    intersect_with_mult(splitted.get_mut(1).unwrap(), &variables)?;
                     let first_part = splitted.get(0).unwrap();
                 
+
                     match first_part.get(0).unwrap() {
                         Operator::Var(name) => {
                             if name == "i" || name == "I" {
@@ -375,6 +387,7 @@ pub fn parse_line(line: &str, variables: &HashMap<String, (Option<String>, Vec<O
 
                 }
                 4 => { // Function assignation
+                    intersect_with_mult(splitted.get_mut(1).unwrap(), &variables)?;
                     match &splitted.get(0).unwrap()[..] {
                         [Operator::Var(fn_name), Operator::OpenParenthesis, Operator::Var(var_name), Operator::CloseParenthesis] => {
                             if fn_name == "i" || fn_name == "I" {
@@ -395,6 +408,8 @@ pub fn parse_line(line: &str, variables: &HashMap<String, (Option<String>, Vec<O
             }
         },
         _ => { // Calculation
+            intersect_with_mult(splitted.get_mut(0).unwrap(), &variables)?;
+            intersect_with_mult(splitted.get_mut(1).unwrap(), &variables)?;
             match splitted.get_mut(1).unwrap().pop() {
                 Some(Operator::Var(name)) => match name.as_str() {
                     "?" => {},

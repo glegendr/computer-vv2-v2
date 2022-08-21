@@ -297,7 +297,7 @@ impl BTree {
         ret
     }
 
-    fn get_all_vals(&self) -> Vec<Operator> {
+    pub fn get_all_vals(&self) -> Vec<Operator> {
         match &self.node {
             Operator::Number { .. } | Operator::Mat(_) | Operator::Var(_) => vec![self.node.clone()],
             _ => {
@@ -313,7 +313,7 @@ impl BTree {
         }
     }
 
-    fn all(&self, f: fn(&Self) -> bool) -> bool {
+    pub fn all(&self, f: fn(&Self) -> bool) -> bool {
         let mut ret = f(self);
         if let Some(c1) = &self.c1 {
             ret = ret && c1.all(f);

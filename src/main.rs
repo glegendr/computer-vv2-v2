@@ -22,6 +22,7 @@ fn main() -> rustyline::Result<()> {
     let mut variables: HashMap<String, (Option<String>, Vec<Operator>)> = HashMap::new();
     let mut chart = false;
     let mut tree = false;
+    let mut quadratic_equation = true;
     let mut rl = Editor::<()>::new()?;
     _ = rl.load_history("history.txt");
     loop {
@@ -33,7 +34,7 @@ fn main() -> rustyline::Result<()> {
                 }
                 rl.add_history_entry(line.as_str());
                 if line.starts_with("/") {
-                    command_handler(&line, &mut variables, &mut rl, &mut chart, &mut tree);
+                    command_handler(&line, &mut variables, &mut rl, &mut chart, &mut tree, &mut quadratic_equation);
                     continue
                 }
                 match parse_line(line.as_str(), &variables) {
@@ -46,6 +47,9 @@ fn main() -> rustyline::Result<()> {
                                         true => println!("true"),
                                         false => {
                                             println!("{}", to_printable_string(&value.to_vec()));
+                                            if quadratic_equation {
+                                                print_equation_result(&value);
+                                            }
                                             if tree {
                                                 if let Ok(tree) = BTree::from_vec(&first_part) {
                                                     tree.print();
@@ -76,6 +80,9 @@ fn main() -> rustyline::Result<()> {
                                                     true => println!("true"),
                                                     false => {
                                                         println!("{}", to_printable_string(&value.to_vec()));
+                                                        if quadratic_equation {
+                                                            print_equation_result(&value);
+                                                        }
                                                         if tree {
                                                             if let Ok(tree) = BTree::from_vec(&first_part) {
                                                                 tree.print();
@@ -129,6 +136,47 @@ fn main() -> rustyline::Result<()> {
         }
     }
     rl.save_history("history.txt")
+}
+
+fn print_equation_result(tree: &BTree) {
+    if tree.all(|subtree| match subtree.node {
+        Operator::Number { x, i, .. } => i == 0 && x >= 0 && x <= 2,
+        Operator::Add => true,
+        _ => false
+    }) {
+        let mut x0 = None;
+        let mut x1 = None;
+        let mut x2 = None;
+        for ope in tree.get_all_vals() {
+            match ope {
+                Operator::Number { number, x, .. } => {
+                    match x {
+                        0 => x0 = Some(x0.unwrap_or(0.) + number),
+                        1 => x1 = Some(x1.unwrap_or(0.) + number),
+                        2 => x2 = Some(x2.unwrap_or(0.) + number),
+                        _ => return
+                    }
+                },
+                _ => return
+            }
+        }
+        if x2.is_none() {
+            return
+        }
+        let disc = x1.unwrap_or(0.).powf(2.) - x2.unwrap_or(0.) * x0.unwrap_or(0.) * 4.;
+        println!("∆ = {disc}");
+        if disc < 0. {
+            println!("No solution on R");
+        } else if disc == 0. {
+            println!("A unique solution as been founded:");
+            println!("x = {}", -x1.unwrap_or(0.) / (2. * x2.unwrap_or(1.)));
+        } else {
+            println!("Two solutions as been founded:");
+            let res_x1 = (-x1.unwrap_or(0.) - disc.sqrt()) / (2. * x2.unwrap_or(1.));
+            let res_x2 = (-x1.unwrap_or(0.) + disc.sqrt()) / (2. * x2.unwrap_or(1.));
+            println!("x1 = {res_x1} and x2 = {res_x2}");
+        }
+    }
 }
 
 fn print_chart(tree: &BTree) {

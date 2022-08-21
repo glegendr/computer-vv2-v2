@@ -189,8 +189,8 @@ impl Operator {
                                 },
                                 _ => {}
                             }
-                        } else if let Ok(_nb) = string.trim().parse::<f64>() {
-                            // println!("{:?}", Operator::Number { number: nb, x: 0, i: 0 });
+                        } else {
+                            return None
                         }
                     }
                 }

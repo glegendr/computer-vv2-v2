@@ -8,18 +8,20 @@ pub fn command_handler(
     variables: &mut HashMap<String, (Option<String>, Vec<Operator>)>,
     rl: &mut Editor<()>,
     chart_enabled: &mut bool,
-    tree_enable: &mut bool
+    tree_enable: &mut bool,
+    quadratic_equation: &mut bool,
 ) {
     let splitted: Vec<String> = line.split(" ").map(|cmd| String::from(cmd.trim())).collect();
     if splitted.is_empty() {
         return
     }
-    match splitted.get(0).unwrap().as_str() {
+    match splitted.get(0).unwrap().to_lowercase().as_str() {
         "/history" => history(splitted[1..].to_vec(), rl),
         "/list" => list(splitted[1..].to_vec(), variables),
         "/clear" => clear(splitted[1..].to_vec(), variables, rl),
-        "/chart" => on_off(splitted[1..].to_vec(), chart_enabled, "chart"),
-        "/tree" => on_off(splitted[1..].to_vec(), tree_enable, "tree"),
+        "/chart" => on_off(splitted[1..].to_vec(), chart_enabled, "Chart"),
+        "/tree" => on_off(splitted[1..].to_vec(), tree_enable, "Tree"),
+        "/quadratic" => on_off(splitted[1..].to_vec(), quadratic_equation, "Quadratic equation resolution"),
         "/help" => help(splitted[1..].to_vec()),
         cmd => println!("unknown command {cmd} try /help")
     }
@@ -44,6 +46,8 @@ fn help(splitted: Vec<String>) {
                         println!("toggle chart\n");
                         println!("{} {} {} ..", "/tree".purple(), "<?on>".green(), "<?off>".red());
                         println!("toggle tree\n");
+                        println!("{} {} {} ..", "/quadratic".purple(), "<?on>".green(), "<?off>".red());
+                        println!("toggle quadratic equation resolution\n");
                         println!("{} {} ..", "/help".purple(),  "<?cmd> <?ass> <?calc> <?*>".yellow());
                         println!("display helping message about commands, assignation and calculus\n");
                     }
