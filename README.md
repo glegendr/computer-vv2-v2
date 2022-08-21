@@ -13,6 +13,7 @@ You need rust and Cargo, then launch:
 |/clear|`<?history> <?variables> <?*>`|clear history and variables or only selected one|
 |/chart|`<?on> <?off>`|toggle chart|
 |/tree|`<?on> <?off>`|toggle tree|
+|/quadratic|`<?on> <?off>`|toggle quadratic equation resolution|
 |/help|`<?cmd> <?ass> <?calc> <?*>`|display helping message about commands, assignation and calculus|
 
 ## Assignation
