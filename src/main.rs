@@ -52,7 +52,7 @@ fn main() -> rustyline::Result<()> {
                                                 }
                                             }
                                             if chart {
-                                                print_chart(&first_part);
+                                                print_chart(&value);
                                             }
                                         }
                                     }
@@ -82,7 +82,7 @@ fn main() -> rustyline::Result<()> {
                                                             }
                                                         }
                                                         if chart {
-                                                            print_chart(&first_part);
+                                                            print_chart(&value);
                                                         }
                                                     }
                                                 }
@@ -131,20 +131,16 @@ fn main() -> rustyline::Result<()> {
     rl.save_history("history.txt")
 }
 
-fn print_chart(input: &Vec<Operator>) {
+fn print_chart(tree: &BTree) {
     Chart::new(120, 40, -10., 10.)
     .lineplot(&Shape::Continuous(Box::new(|nb| {
-        let changed = input.iter().map(|ope| {
-            match ope {
-                Operator::Number { number, x, i } => Operator::Number { number: number * (nb as f64).powf(*x as f64), x: 0, i: *i },
-                _ => ope.clone()
-            }
-        })
-        .collect();
-        match calc(&changed) {
+        match tree.change_x(nb as f64).eval() {
             Ok(res) => {
                 match res.node {
                     Operator::Number { number, .. } => {
+                        if number == f64::INFINITY {
+                            return -f32::INFINITY
+                        }
                         if number >= f32::MAX as f64 {
                             f32::MAX - 1.
                         } else {

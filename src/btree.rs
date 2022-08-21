@@ -434,4 +434,18 @@ impl BTree {
             }
         }
     }
+
+    pub fn change_x(&self, by: f64) -> Self {
+        let mut ret = self.clone();
+        if let Operator::Number { number, x, i } = ret.node {
+            ret.node = Operator::Number { number: number * by.powf(x as f64), x: 0, i };
+        }
+        if let Some(c1) = ret.c1 {
+           ret.c1 = Some(Box::new(c1.change_x(by)));
+        }
+        if let Some(c2) = ret.c2 {
+           ret.c2 = Some(Box::new(c2.change_x(by)));
+        }
+        ret
+    }
 }
