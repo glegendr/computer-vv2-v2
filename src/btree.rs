@@ -163,6 +163,7 @@ impl BTree {
             return Ok(self.clone())
         }
         let mut new_tree = self.clone();
+        new_tree = new_tree.delete_minus();
         if let Some(c1) = &new_tree.c1 {
             new_tree.c1 = Some(Box::new(c1.eval()?));
         }
@@ -185,7 +186,6 @@ impl BTree {
             },
             _ => return Err(String::from("Only one child founded"))
         }
-        new_tree = new_tree.delete_minus(false);
         if new_tree.has_equivalent_precedence() {
             let clone = new_tree.clone();
             new_tree = new_tree.calc_equivalent();
@@ -193,10 +193,35 @@ impl BTree {
                 new_tree = new_tree.eval()?;
             }
         }
+        if new_tree.expand_power() {
+            new_tree = new_tree.eval()?;
+        }
         if new_tree.calc_mult() {
             new_tree = new_tree.eval()?;
         }
         Ok(new_tree)
+    }
+
+    fn expand_power(&mut self) -> bool {
+        let mut ret = false;
+        if let Operator::Power = self.node {
+            if let (Some(c1), Some(c2)) = (&self.c1, &self.c2) {
+                if let Operator::Number { number, x, i } = c2.node {
+                    if x == 0 && i == 0 && number > 0. && number == number.round() && number < 5. {
+                        ret = true;
+                        let mut new_tree = *c1.clone();
+                        for _ in 1..(number as i64) {
+                            let mut new_tree_2 = BTree::new(Operator::Mult);
+                            new_tree_2.insert_a(new_tree.clone());
+                            new_tree_2.insert_b(*c1.clone());
+                            new_tree = new_tree_2;
+                        }
+                        *self = new_tree;
+                    }
+                }
+            }
+        }
+        ret
     }
 
     fn calc_equivalent(&self) -> Self {
@@ -382,44 +407,28 @@ impl BTree {
         }
     }
 
-    fn delete_minus(&self, encounter: bool) -> BTree {
+    fn delete_minus(&self) -> BTree {
         match &self.node {
             Operator::Minus => {
                 let mut ret = BTree::new(Operator::Add);
                 if let Some(c1) = &self.c1 {
-                    ret.insert_a(c1.delete_minus(encounter));
+                    ret.insert_a(c1.delete_minus());
                 }
                 if let Some(c2) = &self.c2 {
-                    ret.insert_b(c2.delete_minus(!encounter));
+                    let mut new_c2 = BTree::new(Operator::Mult);
+                    new_c2.insert_a(BTree::new(Operator::Number { number: -1., x: 0, i: 0 }));
+                    new_c2.insert_b(c2.delete_minus());
+                    ret.insert_b(new_c2);
                 }
                 ret
             },
-            Operator::Add => {
-                let mut ret = BTree::new(Operator::Add);
-                if let Some(c1) = &self.c1 {
-                    ret.insert_a(c1.delete_minus(encounter));
-                }
-                if let Some(c2) = &self.c2 {
-                    ret.insert_b(c2.delete_minus(encounter));
-                }
-                ret
-
-            },
-            Operator::Number { number, x, i } => {
-                let mult = if encounter {
-                    -1.
-                } else {
-                    1.
-                };
-                BTree::new(Operator::Number { number: number * mult, x: *x, i: *i })
-            }
             ope => {
                 let mut ret = BTree::new(ope.clone());
                 if let Some(c1) = &self.c1 {
-                    ret.insert_a(c1.delete_minus(encounter));
+                    ret.insert_a(c1.delete_minus());
                 }
                 if let Some(c2) = &self.c2 {
-                    ret.insert_b(c2.delete_minus(false));
+                    ret.insert_b(c2.delete_minus());
                 }
                 ret
             }
