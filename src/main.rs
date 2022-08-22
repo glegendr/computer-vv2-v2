@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use calculation::calc;
 use commands::command_handler;
+use highlighter::MatchingBracketHighlighter;
+use hinter::{ComputorHinter, diy_hints};
 use parsing::ActionType;
 use rustyline::Editor;
 mod assignation;
@@ -16,6 +18,8 @@ use crate::operator::Operator;
 use crate::assignation::{to_printable_string};
 use crate::parsing::parse_line;  
 use textplots::{Chart, Plot, Shape};
+mod hinter;
+mod highlighter;
 
 fn main() -> rustyline::Result<()> {
     // `()` can be used when no completer is required
@@ -23,10 +27,18 @@ fn main() -> rustyline::Result<()> {
     let mut chart = false;
     let mut tree = false;
     let mut quadratic_equation = true;
-    let mut rl = Editor::<()>::new()?;
+    let mut rl = Editor::<ComputorHinter>::new()?;
+    let h = ComputorHinter {
+        hints: diy_hints(),
+        highlighter: MatchingBracketHighlighter::new(),
+        colored_prompt: "".to_owned(),
+    };
+    rl.set_helper(Some(h));
     _ = rl.load_history("history.txt");
     loop {
-        let readline = rl.readline("> ");
+        let p= "> ";
+        rl.helper_mut().expect("No helper").colored_prompt = String::from(p);
+        let readline = rl.readline(p);
         match readline {
             Ok(line) => {
                 if line.is_empty() {

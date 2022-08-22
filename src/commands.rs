@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use colored::Colorize;
 use rustyline::Editor;
-use crate::{operator::Operator, assignation::to_printable_string};
+use crate::{operator::Operator, assignation::to_printable_string, ComputorHinter };
 
 pub fn command_handler(
     line: &str,
     variables: &mut HashMap<String, (Option<String>, Vec<Operator>)>,
-    rl: &mut Editor<()>,
+    rl: &mut Editor<ComputorHinter >,
     chart_enabled: &mut bool,
     tree_enable: &mut bool,
     quadratic_equation: &mut bool,
@@ -95,7 +95,7 @@ fn on_off(splitted: Vec<String>, enabled: &mut bool, name: &str) {
     }
 }
 
-fn clear(splitted: Vec<String>, variables: &mut HashMap<String, (Option<String>, Vec<Operator>)>, rl: &mut Editor<()>) {
+fn clear(splitted: Vec<String>, variables: &mut HashMap<String, (Option<String>, Vec<Operator>)>, rl: &mut Editor<ComputorHinter >) {
     match splitted.is_empty() {
         true => {
             variables.clear();
@@ -125,7 +125,7 @@ fn clear(splitted: Vec<String>, variables: &mut HashMap<String, (Option<String>,
     }
 }
 
-fn history(splitted: Vec<String>, rl: &mut Editor<()>) {
+fn history(splitted: Vec<String>, rl: &mut Editor<ComputorHinter >) {
     match splitted.is_empty() {
         true => rl.history().iter().for_each(|x| println!("{x}")),
         false => {
